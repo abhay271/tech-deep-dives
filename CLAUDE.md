@@ -5,7 +5,8 @@ This repo is one self-contained `index.html` (served by GitHub Pages from `main`
 ## Content spec
 
 - Each run, pick ONE popular app or system used by millions (Netflix, Discord, Google Maps, Uber, Spotify, WhatsApp, Instagram, Cloudflare, Postgres, etc.) and explain how it actually works under the hood.
-- **Audience:** software engineers. Be concrete (architecture, protocols, data flow, storage and scaling trade-offs, real implementation details) without piling on jargon or writing a textbook chapter. The goal is to satisfy curiosity.
+- **Audience:** software engineers, including students and juniors who are new to most of the systems covered. Assume the reader has NOT heard of the specific tech in the entry. Be concrete (architecture, protocols, data flow, storage and scaling trade-offs, real implementation details) without piling on jargon or writing a textbook chapter. The goal is to satisfy curiosity.
+- **Tone and legend (important):** Write like a smart friend explaining over coffee, not a paper. New terms and tech words are welcome, but every entry MUST include a **Legend** (see components) that briefly explains each new or non-obvious term in one or two plain sentences, and the first use of each term in the prose is wrapped in `<dfn class="term" title="short definition">`. Prefer one vivid analogy or concrete example over three technical details. Keep numbers to the few that make a point. If a paragraph needs re-reading, simplify it. Aim for 4-6 minutes of reading. Legend has 4-10 entries, ordered by first appearance.
 - **Rotate domains** between runs: consumer apps, infra, databases, OS/runtime internals, dev tools, odd protocol choices. Never two similar topics back to back. Before choosing, read all existing `<article>` elements and their `data-topic` / `data-domain` attributes (`grep -o 'data-topic="[^"]*" data-domain="[^"]*"' index.html`). Never repeat a topic, and pick a domain different from the last two entries.
 - **Shape:** start with the core functionality and the design challenge it creates, then roughly: (1) **The design**, the one or two architectural choices that make it work; (2) **Why**, the real constraint or trade-off that forced it, with as much room as it deserves; (3) **Things this explains**, 2-3 behaviors people experience constantly but never questioned, now obvious given the design. A guide, not a checklist; length follows what's genuinely interesting. No headers for the sake of headers.
 - **Accuracy:** verify technical claims against reliable current sources (web search/fetch) when unsure. Prefer primary sources (the company's engineering blog, the RFC, the paper, the source code). If not confident about a detail, say so in the text using the confidence-note component instead of asserting it. Never invent numbers.
@@ -38,6 +39,13 @@ This repo is one self-contained `index.html` (served by GitHub Pages from `main`
     <p class="lede">Core functionality and the design challenge it creates.</p>
   </header>
   <div class="prose">
+    <details class="legend" open>
+      <summary>Legend: terms used below</summary>
+      <dl>
+        <div><dt>Term</dt><dd>One or two plain sentences, no further jargon.</dd></div>
+        <div><dt>Another term</dt><dd>…</dd></div>
+      </dl>
+    </details>
     <section class="reveal"><h3>The design</h3><p>… <code>inline code</code> …</p></section>
     <figure class="diagram-fig"> … see below … </figure>
     <aside class="callout why reveal"><span class="callout-label">Why</span><p>…</p></aside>
@@ -64,4 +72,4 @@ SVG parts (all styled by shared CSS; set `style="--i:N"` for sequence order, N =
 
 1. Read existing entries' topics/domains → choose topic + domain.
 2. Research with web search/fetch; note sources you rely on; decide what to hedge.
-3. Write the entry + TOC line. 4. `python scripts/validate.py`. 5. Commit, push to `main`.
+3. Write the entry (with Legend) + TOC line. 4. `python scripts/validate.py`. 5. Commit, push to `main`.

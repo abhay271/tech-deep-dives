@@ -107,6 +107,10 @@ for a in arts:
     art_ids.append(attrs.get("id"))
     if attrs.get("id") and not re.fullmatch(r"\d{4}-\d{2}-\d{2}-[a-z0-9-]+", attrs["id"]):
         err(f"bad article id format: {attrs['id']}")
+# entries from 2026-10-01 on must include a Legend
+for m in re.finditer(r'<article class="entry" id="(\d{4}-\d{2}-\d{2})-[^"]*".*?</article>', html, flags=re.S):
+    if m.group(1) >= "2026-10-01" and 'class="legend"' not in m.group(0):
+        err(f"entry {m.group(1)} is missing a Legend (<details class=\"legend\">)")
 if art_ids != sorted(art_ids, key=lambda x: x[:10], reverse=True):
     err("articles are not newest-first")
 if set(toc) != set(art_ids):
