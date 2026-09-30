@@ -246,17 +246,32 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
         <div class="entry-meta">
           <span class="chip">Consumer apps</span>
           <time datetime="2026-09-30">30 Sep 2026</time>
-          <span class="read"><span class="read-time">6</span> min read</span>
+          <span class="read"><span class="read-time">5</span> min read</span>
         </div>
         <h2 class="entry-title">One message, 200,000 readers: inside Discord</h2>
-        <p class="lede">Discord looks like a chat app. Underneath it is two very different machines: a real-time fan-out engine that has to tell tens of thousands of people about one sentence in well under a second, and an archive that holds trillions of messages and hands any of them back on demand. Both are hard for the same reason: popularity is wildly uneven. Most servers are ten friends. A few are a stadium.</p>
+        <p class="lede">Picture a group chat with 200,000 people in it. Someone types "hi" and every phone has to buzz almost instantly. On top of that, the app has to remember every message ever sent, and find any of them when you scroll back. Discord solves this with two separate systems, and the trick in both is the same: never let one busy chat overwhelm a single worker.</p>
       </header>
 
       <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Server (guild)</dt><dd>What Discord calls a community. Each one has channels like #general. Discord's code calls it a "guild".</dd></div>
+            <div><dt>WebSocket</dt><dd>A connection between your app and Discord's computers that stays open, so Discord can push a message to you the moment it arrives instead of waiting for you to ask.</dd></div>
+            <div><dt>Process</dt><dd>A tiny worker inside a program that does one job and talks to other workers by sending messages. Discord's system runs millions of these at once.</dd></div>
+            <div><dt>Elixir / Erlang</dt><dd>Programming languages built for running huge numbers of these tiny workers. Discord's live chat system is written in Elixir, which runs on Erlang's engine.</dd></div>
+            <div><dt>Node</dt><dd>One machine (or one copy of the program) in a cluster of many machines working together.</dd></div>
+            <div><dt>Fan-out</dt><dd>Taking one message and delivering a copy to many recipients.</dd></div>
+            <div><dt>Partition</dt><dd>A slice of a database stored together. Splitting data into partitions lets many machines share the work.</dd></div>
+            <div><dt>Hot partition</dt><dd>A slice that gets far more traffic than the others, like one checkout lane with a huge queue while the rest sit empty.</dd></div>
+            <div><dt>Request coalescing</dt><dd>When many people ask for the same thing at the same moment, do the work once and share the answer.</dd></div>
+            <div><dt>p99 latency</dt><dd>How slow the slowest 1 in 100 requests is. It shows what unlucky users experience, not just the average.</dd></div>
+          </dl>
+        </details>
         <section class="reveal">
           <h3>The design</h3>
-          <p>Open Discord and your client holds a WebSocket to a gateway written in Elixir, running on the Erlang VM. Each connection becomes a <strong>session process</strong>. Each server (Discord calls them guilds) is also a process: a <strong>guild process</strong> living on some node in the cluster. It is the single owner of that guild's live state: who is a member, who is online, what just happened. Sessions of online members talk to it by plain message passing.</p>
-          <p>When you send a message, the event reaches the guild process, which must deliver it to every session that can see the channel. Doing that as a loop of sends is the obvious design, and it is exactly what fell over. Discord's fix is a library called <code>Manifold</code>: group the recipients by the Erlang node they live on, send <em>one</em> message per node, and let a worker on that node do the local fan-out.</p>
+          <p>Start with the live part. When you open Discord, your app keeps a <dfn class="term" title="A connection that stays open so the server can push messages to you.">WebSocket</dfn> open to Discord's computers. On their side, each connection gets its own tiny worker (a <dfn class="term" title="A tiny independent worker that talks to others by sending messages.">process</dfn>), and each server has one worker of its own, which you can think of as the switchboard operator for that community. When you send a message, it reaches the operator, and the operator has to pass it to the worker of every member who is online.</p>
+          <p>The obvious way is for the operator to hand out copies one by one. That works for ten friends. It falls apart for a huge server, because every hand-off costs a little time, and the operator can only do one at a time. Discord's fix is a library called <code>Manifold</code>: instead of phoning every person, the operator sends <em>one</em> copy to each machine, and a helper on that machine hands it to everyone local.</p>
         </section>
 
         <figure class="diagram-fig">
@@ -284,13 +299,13 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
               <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="0.8s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.75;1" calcMode="linear" path="M110 150H420C452 150 452 230 486 230H642"/><animate attributeName="opacity" dur="5s" begin="0.8s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.72;.75;1"/></circle>
             </svg>
           </div>
-          <figcaption>One message enters, and the guild process forks it once per Erlang node, not once per member. The local fan-out happens on the node that owns the sessions.</figcaption>
+          <figcaption>One message comes in, and the server's operator sends just one copy per machine. Each machine then delivers it to its own connected members, so the work is shared out instead of piling up on one worker.</figcaption>
           <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
         </figure>
 
         <section class="reveal">
-          <p>The archive is the other machine. Messages sit in a wide-column database, partitioned by <code>(channel_id, bucket)</code>, where the bucket is a fixed time window, and ordered within a partition by message ID. IDs are Snowflakes, which embed a timestamp, so they sort by time. "The last 50 messages in #general" then becomes a read of the tail of one partition.</p>
-          <p>Between the API and the database sits a layer of Rust <strong>data services</strong>. When many requests ask for the same rows at once, the first one queries the database and the rest wait for its answer (request coalescing). Requests are routed by consistent hashing on <code>channel_id</code>, so every request for a channel lands on the same instance, which is what makes coalescing actually work.</p>
+          <p>Now the remembering part. Messages are saved in a database organised like a filing cabinet: one folder per channel and stretch of time, with the messages inside kept in order. Every message ID contains its timestamp, so IDs naturally sort by time. "Show me the latest 50 messages" then means opening one folder and reading from the end.</p>
+          <p>In front of that database sits a layer of programs written in Rust, called <strong>data services</strong>. Imagine a librarian who gets asked the same question by a crowd at the same moment. Instead of fetching the book 500 times, they fetch it once and read it out to everyone. That's <dfn class="term" title="Do the work once and share the answer with everyone who asked.">request coalescing</dfn>. It only works if all questions about one channel land on the same librarian, so Discord routes requests by channel.</p>
         </section>
 
         <figure class="diagram-fig">
@@ -319,30 +334,30 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
               <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="6s" begin="0.8s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.75;1;1" calcMode="linear" path="M340 150H252C200 130 190 245 130 245"/><animate attributeName="opacity" dur="6s" begin="0.8s" repeatCount="indefinite" values="0;0;1;1;0" keyTimes="0;.74;.77;.99;1"/></circle>
             </svg>
           </div>
-          <figcaption>Three requests, one database query. Cyan packets are the requests converging on the data service; the large pink one is the single query and its result, which is then handed back to all three callers.</figcaption>
+          <figcaption>Three requests for the same channel arrive. The data service asks the database once (the big pink dot) and shares the answer with all three.</figcaption>
           <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
         </figure>
 
         <aside class="callout why reveal">
           <span class="callout-label">Why</span>
-          <p>Both halves exist because of a single bad day: the day one server is a thousand times bigger than the median one.</p>
-          <p>The old approach, a guild process looping over every session, worked for small servers. Discord's 2017 write-up describes a guild with 30,000 concurrent users where fan-out took 900 ms to 2.1 s. The cause was arithmetic: an Erlang send costs roughly 30 to 70 µs, and 30,000 of them from one process is 0.9 to 2.1 seconds, precisely the measured range. The process fell behind its own mailbox. Grouping by node turns the cost from O(recipients) into O(nodes).</p>
-          <p>The archive had the mirror-image problem. Discord ran Cassandra with 177 nodes and hit hot partitions: a popular channel-bucket gets hammered while thousands of tiny ones sit idle. Reads are costlier than writes in that engine, and quorum reads meant one struggling replica set could slow a whole query. Add JVM garbage-collection pauses and compaction backlogs, and operators were rotating nodes out just to recover. Moving to ScyllaDB (a C++ implementation with no GC) plus the coalescing data services took it to 72 nodes, cut historical-message p99 latency from a 40–125 ms range to about 15 ms, and made insert p99 a steady ~5 ms. The migration itself, rewritten in Rust, moved 3.2 million messages per second and finished in nine days.</p>
+          <p>Both systems exist because of one problem: a few servers are thousands of times bigger than the typical one.</p>
+          <p>The old live system worked for small servers but struggled with big ones. Discord's own write-up describes a server with about 30,000 people online where delivering one message took 0.9 to 2.1 seconds. The maths explains it: each hand-off costs roughly 30 to 70 millionths of a second, and 30,000 of them in a row adds up to almost exactly that. The operator fell behind, and messages queued up. Sending one copy per machine fixes it because the work is now shared.</p>
+          <p>The database had a similar issue. Busy channels became <dfn class="term" title="A slice of data that gets far more traffic than the others.">hot partitions</dfn> while thousands of quiet ones sat idle, and the database software (Cassandra) also paused now and then to tidy up memory. Discord moved to a database called ScyllaDB and added the data services. It went from 177 machines to 72, and the slowest 1% of message reads got faster, from roughly 40 to 125 milliseconds down to about 15.</p>
         </aside>
 
         <blockquote class="pullquote reveal">A send is cheap. Thirty thousand sends from one process is a queue.</blockquote>
 
         <aside class="confidence reveal">
           <span class="callout-label">Confidence note</span>
-          <p>The numbers above come from Discord's own engineering posts (2017 on Elixir/Manifold, 2023 on storage), so they describe the systems as of those dates; Discord has certainly kept changing them. I could not confirm the exact order of hops between the API, storage and the gateway, so the first diagram shows the shape of the fan-out, not a wire trace. The size of the time bucket was reported as about ten days in older write-ups; treat that as approximate.</p>
+          <p>These numbers come from Discord's own engineering posts (2017 for the live system, 2023 for storage), so they describe things as they were then. Discord has almost certainly changed details since. I couldn't confirm the exact order in which the API, database and live system are involved when you send a message, so the first diagram shows the general shape, not an exact trace. The length of each time chunk in the filing cabinet was reported as about ten days in older posts. Treat that as approximate.</p>
         </aside>
 
         <section class="reveal">
           <h3>Things this explains</h3>
           <ol class="explains stagger">
-            <li><strong>Huge servers show only part of the member list.</strong> Sending presence changes for every one of 200,000 members to every viewer would recreate the fan-out problem. Discord's fix is to send updates only for the slice you can see, backed by a sorted structure it moved into Rust (0.61 to 3.68 µs per operation in its benchmarks).</li>
-            <li><strong>Jumping to a months-old message is quick.</strong> Message IDs encode time, so an ID points straight at a bucket (my inference from the partition layout, not something Discord states outright). It is a targeted partition read, not a scan.</li>
-            <li><strong>An <code>@everyone</code> ping doesn't melt the database.</strong> Thousands of people open the same channel within seconds and ask for the same recent messages. Routing by channel and coalescing collapse that stampede into roughly one query.</li>
+            <li><strong>Huge servers only show part of the member list.</strong> Telling every viewer about every one of 200,000 members changing status would bring back the same pile-up. So Discord only sends updates for the part of the list you can actually see on screen.</li>
+            <li><strong>Jumping to a message from months ago is quick.</strong> Message IDs contain the time, so the ID tells Discord which folder to open. (This is my own reasoning from how the storage is laid out, not something Discord states directly.)</li>
+            <li><strong>An <code>@everyone</code> ping doesn't crash things.</strong> Thousands of people open the same channel at the same moment and ask for the same recent messages. Thanks to coalescing, that crowd turns into roughly one database lookup.</li>
           </ol>
         </section>
 
