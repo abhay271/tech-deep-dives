@@ -246,10 +246,10 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
         <div class="entry-meta">
           <span class="chip">Consumer apps</span>
           <time datetime="2026-09-30">30 Sep 2026</time>
-          <span class="read"><span class="read-time">5</span> min read</span>
+          <span class="read"><span class="read-time">4</span> min read</span>
         </div>
         <h2 class="entry-title">One message, 200,000 readers: inside Discord</h2>
-        <p class="lede">Picture a group chat with 200,000 people in it. Someone types "hi" and every phone has to buzz almost instantly. On top of that, the app has to remember every message ever sent, and find any of them when you scroll back. Discord solves this with two separate systems, and the trick in both is the same: never let one busy chat overwhelm a single worker.</p>
+        <p class="lede">Imagine a group chat with 200,000 people. Someone says "hi" and every phone lights up almost instantly. Discord also remembers every message ever sent and can find any of them when you scroll back. It manages both with one simple idea: split the work up so no single worker ever gets overwhelmed.</p>
       </header>
 
       <div class="prose">
@@ -270,8 +270,8 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
         </details>
         <section class="reveal">
           <h3>The design</h3>
-          <p>Start with the live part. When you open Discord, your app keeps a <dfn class="term" title="A connection that stays open so the server can push messages to you.">WebSocket</dfn> open to Discord's computers. On their side, each connection gets its own tiny worker (a <dfn class="term" title="A tiny independent worker that talks to others by sending messages.">process</dfn>), and each server has one worker of its own, which you can think of as the switchboard operator for that community. When you send a message, it reaches the operator, and the operator has to pass it to the worker of every member who is online.</p>
-          <p>The obvious way is for the operator to hand out copies one by one. That works for ten friends. It falls apart for a huge server, because every hand-off costs a little time, and the operator can only do one at a time. Discord's fix is a library called <code>Manifold</code>: instead of phoning every person, the operator sends <em>one</em> copy to each machine, and a helper on that machine hands it to everyone local.</p>
+          <p>First, the live part. When you open Discord, your app keeps a <dfn class="term" title="A connection that stays open so the server can push messages to you.">WebSocket</dfn> open to Discord's computers. Every connection gets its own tiny worker (a <dfn class="term" title="A tiny independent worker that talks to others by sending messages.">process</dfn>), and every server gets one too. Think of it as a switchboard operator for that community. Send a message and it goes to the operator, who passes it on to everyone who is online. All of this runs on <dfn class="term" title="A language built for running huge numbers of tiny workers at once.">Elixir</dfn>, a language made for exactly this kind of job.</p>
+          <p>The obvious approach is for the operator to send copies one at a time. That's fine for ten friends. For a giant server it's a traffic jam, because the operator can only do one hand-off at a time. Discord's answer: the operator sends just one copy to each machine (a <dfn class="term" title="One machine in a group of machines working together.">node</dfn>), and a helper on that machine passes it to the people connected there. It's still <dfn class="term" title="Delivering one message to many recipients.">fan-out</dfn>, but the work is shared between many workers.</p>
         </section>
 
         <figure class="diagram-fig">
@@ -304,8 +304,8 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
         </figure>
 
         <section class="reveal">
-          <p>Now the remembering part. Messages are saved in a database organised like a filing cabinet: one folder per channel and stretch of time, with the messages inside kept in order. Every message ID contains its timestamp, so IDs naturally sort by time. "Show me the latest 50 messages" then means opening one folder and reading from the end.</p>
-          <p>In front of that database sits a layer of programs written in Rust, called <strong>data services</strong>. Imagine a librarian who gets asked the same question by a crowd at the same moment. Instead of fetching the book 500 times, they fetch it once and read it out to everyone. That's <dfn class="term" title="Do the work once and share the answer with everyone who asked.">request coalescing</dfn>. It only works if all questions about one channel land on the same librarian, so Discord routes requests by channel.</p>
+          <p>Now the remembering part. Messages are stored like papers in a filing cabinet: one folder for each channel and stretch of time, with the messages inside kept in order. Every message ID includes the time it was sent, so "show me the latest messages" just means opening the right folder and reading the end.</p>
+          <p>In front of the database sits a helper layer called the data services. Picture a librarian who gets asked the same question by a big crowd. They look it up once and read the answer out to everyone. That's <dfn class="term" title="Do the work once and share the answer with everyone who asked.">request coalescing</dfn>. It works because all questions about one channel go to the same librarian.</p>
         </section>
 
         <figure class="diagram-fig">
@@ -340,24 +340,24 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
         <aside class="callout why reveal">
           <span class="callout-label">Why</span>
-          <p>Both systems exist because of one problem: a few servers are thousands of times bigger than the typical one.</p>
-          <p>The old live system worked for small servers but struggled with big ones. Discord's own write-up describes a server with about 30,000 people online where delivering one message took 0.9 to 2.1 seconds. The maths explains it: each hand-off costs roughly 30 to 70 millionths of a second, and 30,000 of them in a row adds up to almost exactly that. The operator fell behind, and messages queued up. Sending one copy per machine fixes it because the work is now shared.</p>
-          <p>The database had a similar issue. Busy channels became <dfn class="term" title="A slice of data that gets far more traffic than the others.">hot partitions</dfn> while thousands of quiet ones sat idle, and the database software (Cassandra) also paused now and then to tidy up memory. Discord moved to a database called ScyllaDB and added the data services. It went from 177 machines to 72, and the slowest 1% of message reads got faster, from roughly 40 to 125 milliseconds down to about 15.</p>
+          <p>Both ideas exist because a few servers are far bigger than the rest.</p>
+          <p>The old live system did fine for small servers but struggled with big ones. Discord once measured a server with about 30,000 people online where a single message took up to two seconds to reach everyone. The operator was doing tens of thousands of tiny hand-offs in a row, and they added up. Sending one copy per machine spread that work out.</p>
+          <p>The database had a similar problem. A few very busy channels (<dfn class="term" title="A slice of data that gets far more traffic than the others.">hot partitions</dfn>) got hammered while thousands of quiet ones sat idle, and the database sometimes paused to clean up after itself. Discord switched databases and added the librarian layer. It now runs on 72 machines instead of 177, and even the slowest 1% of requests (the <dfn class="term" title="How slow the slowest 1 in 100 requests is.">p99 latency</dfn>) got several times faster.</p>
         </aside>
 
         <blockquote class="pullquote reveal">A send is cheap. Thirty thousand sends from one process is a queue.</blockquote>
 
         <aside class="confidence reveal">
           <span class="callout-label">Confidence note</span>
-          <p>These numbers come from Discord's own engineering posts (2017 for the live system, 2023 for storage), so they describe things as they were then. Discord has almost certainly changed details since. I couldn't confirm the exact order in which the API, database and live system are involved when you send a message, so the first diagram shows the general shape, not an exact trace. The length of each time chunk in the filing cabinet was reported as about ten days in older posts. Treat that as approximate.</p>
+          <p>These figures come from Discord's own engineering blog posts (2017 and 2023), so they show how things worked then, and Discord has likely changed things since. I couldn't confirm the exact order of steps between the app, the database and the live system when you hit send, so the first diagram shows the general idea rather than an exact trace. The "stretch of time" per folder was about ten days in older posts. Treat that as approximate.</p>
         </aside>
 
         <section class="reveal">
           <h3>Things this explains</h3>
           <ol class="explains stagger">
-            <li><strong>Huge servers only show part of the member list.</strong> Telling every viewer about every one of 200,000 members changing status would bring back the same pile-up. So Discord only sends updates for the part of the list you can actually see on screen.</li>
-            <li><strong>Jumping to a message from months ago is quick.</strong> Message IDs contain the time, so the ID tells Discord which folder to open. (This is my own reasoning from how the storage is laid out, not something Discord states directly.)</li>
-            <li><strong>An <code>@everyone</code> ping doesn't crash things.</strong> Thousands of people open the same channel at the same moment and ask for the same recent messages. Thanks to coalescing, that crowd turns into roughly one database lookup.</li>
+            <li><strong>Big servers only show part of the member list.</strong> Updating all 200,000 names for everyone would cause the same traffic jam, so you only get updates for the names on your screen.</li>
+            <li><strong>Jumping to an old message is fast.</strong> Message IDs include the time, so Discord knows which folder to open. (This is my own reasoning from how the storage works, not something Discord says directly.)</li>
+            <li><strong>An <code>@everyone</code> ping doesn't break things.</strong> Thousands of people open the channel at once and ask for the same recent messages. The librarian answers once for all of them.</li>
           </ol>
         </section>
 
