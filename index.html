@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-01-sqlite-one-file"><time datetime="2026-10-01">2026-10-01</time><span>SQLite: a whole database in one file</span></a></li>
         <li><a href="#2026-09-30-discord-message-path"><time datetime="2026-09-30">2026-09-30</time><span>Discord: one message, 200,000 readers</span></a></li>
       </ol>
     </nav>
@@ -241,6 +242,115 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-01-sqlite-one-file" data-topic="SQLite" data-domain="Databases" data-date="2026-10-01">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-10-01">1 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">A whole database in one file: SQLite</h2>
+        <p class="lede">Your phone's contacts, your browser's history and countless apps all keep their data in a real database, yet none of them runs a database server. SQLite is a database that is just a library and a file. The design challenge: stay correct even when the power dies in the middle of a save.</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Database server</dt><dd>A separate program that owns the data. Other programs connect to it over a network and ask it to read or change things. Postgres and MySQL work this way.</dd></div>
+            <div><dt>Library</dt><dd>Code that gets built into your own program, so it runs inside it and not as a separate program.</dd></div>
+            <div><dt>Page</dt><dd>A fixed-size chunk of the file. The database reads and writes the file one page at a time.</dd></div>
+            <div><dt>Transaction</dt><dd>A group of changes that must happen all together or not at all, like moving money between two accounts.</dd></div>
+            <div><dt>Journal</dt><dd>A safety copy kept on the side while changes are being made, so a crash can be undone cleanly.</dd></div>
+            <div><dt>WAL (write-ahead log)</dt><dd>A mode where new changes are first added to the end of a separate log file, and only copied into the main file later.</dd></div>
+            <div><dt>Checkpoint</dt><dd>The moment the log's changes are copied into the main database file and the log is cleared.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Most databases work like a restaurant. You sit at a table (your app), and a kitchen (the <dfn class="term" title="A separate program that owns the data and answers requests over a connection.">database server</dfn>) does the cooking. SQLite is more like a cookbook on your own shelf. You read it and cook right there in your own kitchen.</p>
+          <p>Technically, SQLite is a <dfn class="term" title="Code built into your program that runs inside it.">library</dfn>. When your app asks a question in SQL, the code runs inside your app's own process and reads one ordinary file on disk. No network, no setup, no password. Copying the database means copying the file.</p>
+          <p>Inside that file, the data is cut into equal-sized <dfn class="term" title="A fixed-size chunk of the database file.">pages</dfn>, and each table is organised as a tree of pages, so looking something up means hopping down a few levels instead of reading everything.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: SQLite runs inside the app. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-01-sqlite-one-file-d1-t 2026-10-01-sqlite-one-file-d1-d">
+              <title id="2026-10-01-sqlite-one-file-d1-t">Server database versus SQLite</title>
+              <desc id="2026-10-01-sqlite-one-file-d1-d">Top row: an app talks over a network to a database server, which reads the data files. Bottom row: an app with SQLite built in reads the single database file directly.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="30" width="120" height="50" rx="10"/><text class="d-text" x="80" y="60" text-anchor="middle">App</text></g>
+              <path class="d-edge" style="--i:1" d="M140 55H260"/><path class="d-arrow" style="--i:1" d="M253 50L261 55L253 60Z"/>
+              <g class="d-node alt" style="--i:2"><rect x="262" y="30" width="170" height="50" rx="10"/><text class="d-text" x="347" y="60" text-anchor="middle">Database server</text></g>
+              <path class="d-edge" style="--i:3" d="M432 55H560"/><path class="d-arrow" style="--i:3" d="M553 50L561 55L553 60Z"/>
+              <g class="d-node" style="--i:4"><rect x="562" y="30" width="170" height="50" rx="10"/><text class="d-text" x="647" y="60" text-anchor="middle">Data files</text></g>
+              <text class="d-label" style="--i:1" x="200" y="45" text-anchor="middle">network</text>
+              <g class="d-node accent" style="--i:5"><rect x="20" y="140" width="240" height="60" rx="12"/><text class="d-text" x="140" y="165" text-anchor="middle">App</text><text class="d-sub" x="140" y="185" text-anchor="middle">SQLite built in</text></g>
+              <path class="d-edge accent" style="--i:6" d="M260 170H560"/><path class="d-arrow" style="--i:6" d="M553 165L561 170L553 175Z"/>
+              <g class="d-node" style="--i:7"><rect x="562" y="145" width="170" height="50" rx="10"/><text class="d-text" x="647" y="175" text-anchor="middle">One file</text></g>
+              <text class="d-label" style="--i:6" x="410" y="160" text-anchor="middle">no middleman</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M140 55H647"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M260 170H647"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>A normal database has a middleman program. SQLite removes it: the app reads the file itself.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>That raises the hard question. If your app writes straight into the file, what happens when the phone dies halfway through saving? You could be left with half-old, half-new data.</p>
+          <p>SQLite's answer is the <dfn class="term" title="A group of changes that all happen or none do.">transaction</dfn>. Before changing a page, it first saves a safety copy in a <dfn class="term" title="A side copy used to undo a change after a crash.">journal</dfn>. If the power dies, the next program to open the file sees the leftover journal and rolls the file back to how it was. A save either fully happened or never did.</p>
+          <p>Modern setups often use a different trick, called <dfn class="term" title="Write-ahead log: changes go to a separate log first, and are copied into the main file later.">WAL</dfn> mode. Instead of copying old pages aside, new changes are simply added to the end of a log file. Readers look at the main file plus the log, so a writer never blocks them. Now and then a <dfn class="term" title="Copying the log's changes into the main file and clearing the log.">checkpoint</dfn> tidies the log into the main file.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: write-ahead log. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-01-sqlite-one-file-d2-t 2026-10-01-sqlite-one-file-d2-d">
+              <title id="2026-10-01-sqlite-one-file-d2-t">Write-ahead log mode</title>
+              <desc id="2026-10-01-sqlite-one-file-d2-d">A writer appends changes to the log file. Readers read both the main file and the log. Later a checkpoint copies the log contents into the main file.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="20" y="30" width="110" height="50" rx="10"/><text class="d-text" x="75" y="60" text-anchor="middle">Writer</text></g>
+              <path class="d-edge accent" style="--i:1" d="M130 55H300"/><path class="d-arrow" style="--i:1" d="M293 50L301 55L293 60Z"/>
+              <g class="d-node alt" style="--i:2"><rect x="302" y="30" width="170" height="50" rx="10"/><text class="d-text" x="387" y="52" text-anchor="middle">Log file</text><text class="d-sub" x="387" y="70" text-anchor="middle">new changes added</text></g>
+              <path class="d-edge" style="--i:4" d="M472 55H600"/><path class="d-arrow" style="--i:4" d="M593 50L601 55L593 60Z"/>
+              <g class="d-node" style="--i:5"><rect x="602" y="30" width="130" height="50" rx="10"/><text class="d-text" x="667" y="60" text-anchor="middle">Main file</text></g>
+              <text class="d-label" style="--i:4" x="536" y="45" text-anchor="middle">checkpoint</text>
+              <g class="d-node" style="--i:6"><rect x="20" y="170" width="110" height="50" rx="10"/><text class="d-text" x="75" y="200" text-anchor="middle">Readers</text></g>
+              <path class="d-edge" style="--i:7" d="M130 190H300C350 190 380 150 387 90"/><path class="d-arrow" style="--i:7" d="M381 97L387 82L393 97Z"/>
+              <path class="d-edge" style="--i:7" d="M130 205H667V90"/><path class="d-arrow" style="--i:7" d="M661 97L667 82L673 97Z"/>
+              <text class="d-label" style="--i:7" x="400" y="240" text-anchor="middle">readers check both, and never wait for the writer</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.35;1" calcMode="linear" path="M130 55H387"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.33;.35;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.4;.75;1" calcMode="linear" path="M387 55H667"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.39;.42;.73;.75;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The writer only ever adds to the end of the log. Later, a checkpoint moves those changes into the main file.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The big trade-off is who gets to write. With one file and no middleman, nobody is there to direct traffic, so SQLite allows only one writer at a time. Others wait their turn. Many readers are fine, but writers queue.</p>
+          <p>That sounds like a weakness, and for a website with thousands of people saving at once, it is. But most uses are one app, one user, one phone. There, giving up the server buys a lot: nothing to install, nothing to keep running, nothing to secure, and a file you can copy or back up like a photo.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">The best database server is the one you never have to run.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>This is the simplified picture from SQLite's own documentation. Details vary by setup: the default is the rollback journal, and WAL mode has to be switched on. I haven't checked how any specific app, phone or browser configures it, so don't read this as a claim about them.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Apps recover fine after a crash or dead battery.</strong> The leftover journal or log tells SQLite how to roll back the half-finished save the next time the file opens.</li>
+            <li><strong>Backing up an app's data can be as easy as copying one file.</strong> The whole database lives in it. (Copy it while nobody is writing, or use SQLite's backup tool, to avoid grabbing a half-finished state.)</li>
+            <li><strong>It's a poor fit for a busy multi-user website.</strong> Writers queue behind one another, and sharing a database file across a network is risky. That's what database servers are for.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: SQLite documentation, <a href="https://www.sqlite.org/whentouse.html">Appropriate Uses For SQLite</a>; <a href="https://www.sqlite.org/atomiccommit.html">Atomic Commit In SQLite</a>; <a href="https://www.sqlite.org/wal.html">Write-Ahead Logging</a>; <a href="https://www.sqlite.org/fileformat.html">Database File Format</a>.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-09-30-discord-message-path" data-topic="Discord" data-domain="Consumer apps" data-date="2026-09-30">
       <header class="entry-head">
         <div class="entry-meta">
