@@ -23,7 +23,10 @@ This repo is one self-contained `index.html` (served by GitHub Pages from `main`
 - Diagrams are hand-written inline SVG using the shared diagram classes. No Mermaid, no image files, no external JS or CDN dependencies. Fonts may use Google Fonts with system fallbacks (already set up).
 - Use the newest entry as your template: copy its markup structure (header, `.prose`, sections, callouts, figure/diagram markup).
 - **Validate before committing:** run `python scripts/validate.py`. It checks well-formed HTML, that every SVG parses and has a title/desc, no duplicate ids, and (via `git diff`) that no existing line was modified or removed. Fix everything it reports. Also make sure every SVG id you use is prefixed with the entry slug.
-- **Commit message:** `Add deep-dive: <topic> (<domain>)`. Push to `main` (`git push origin HEAD:main`). Do not open a PR.
+- **Commit message:** `Add deep-dive: <topic> (<domain>)`, then a blank line and these two trailer lines at the very end, exactly (the repo owner is credited as co-author; keep any other trailers your environment adds):
+  `Co-Authored-By: abhay271 <153154236+abhay271@users.noreply.github.com>`
+  `Co-Authored-By: Claude <noreply@anthropic.com>`
+  Push to `main` (`git push origin HEAD:main`). Do not open a PR. The trailers are only metadata; never let them block or delay the commit and push.
 
 ## Component reference (entry markup)
 
