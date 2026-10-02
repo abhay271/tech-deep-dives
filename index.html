@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-02-git-snapshots"><time datetime="2026-10-02">2026-10-02</time><span>Git: a filing cabinet named by contents</span></a></li>
         <li><a href="#2026-10-01-sqlite-one-file"><time datetime="2026-10-01">2026-10-01</time><span>SQLite: a whole database in one file</span></a></li>
         <li><a href="#2026-09-30-discord-message-path"><time datetime="2026-09-30">2026-09-30</time><span>Discord: one message, 200,000 readers</span></a></li>
       </ol>
@@ -242,6 +243,93 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-02-git-snapshots" data-topic="Git" data-domain="Dev tools" data-date="2026-10-02">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Dev tools</span>
+          <time datetime="2026-10-02">2 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Git is a filing cabinet that names things by their contents</h2>
+        <p class="lede">Millions of developers use Git to save every version of their code, jump back in time, and work on separate copies without stepping on each other. The design challenge: keep the full history of a huge project, cheaply, and notice instantly if anything was ever tampered with or corrupted.</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Hash</dt><dd>A short fingerprint computed from some data. The same data always gives the same fingerprint, and even a one-letter change gives a completely different one.</dd></div>
+            <div><dt>Content-addressable</dt><dd>Stored and looked up by a fingerprint of the content itself, instead of by a name you picked.</dd></div>
+            <div><dt>Commit</dt><dd>One saved snapshot of the whole project, plus a note about who saved it, when and why.</dd></div>
+            <div><dt>Branch</dt><dd>A movable label that points at one commit. Making a new one just means adding a label.</dd></div>
+            <div><dt>Delta</dt><dd>Storing only what changed between two versions, not a full copy of each.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine a filing cabinet where you never choose a label. Instead, a clerk reads each document, works out its <dfn class="term" title="A fingerprint computed from data: same data, same fingerprint; any change, a totally different one.">hash</dfn>, and files it under that fingerprint. Ask for the fingerprint, get the exact document back. That is Git's core: a <dfn class="term" title="Stored and found by a fingerprint of its own content.">content-addressable</dfn> store.</p>
+          <p>Everything is built from just a few kinds of items filed this way. A file's contents. A folder, which is a list of names pointing at file fingerprints. And a <dfn class="term" title="A saved snapshot of the whole project with a note on who, when and why.">commit</dfn>, which points at the top folder and at the previous commit.</p>
+          <p>Notice the trick: a commit's fingerprint depends on the fingerprints inside it, including its parent's. So the history is a chain where each link vouches for everything before it. Change one old file and every fingerprint after it changes too.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: Git commits chained by hashes. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-02-git-snapshots-d1-t 2026-10-02-git-snapshots-d1-d">
+              <title id="2026-10-02-git-snapshots-d1-t">Commits chained by fingerprints</title>
+              <desc id="2026-10-02-git-snapshots-d1-d">Three commits in a row, each pointing back at the one before. Each commit points at a snapshot folder, and unchanged files are shared between snapshots. Two branch labels point at commits.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="30" width="150" height="50" rx="10"/><text class="d-text" x="95" y="60" text-anchor="middle">Commit 1</text></g>
+              <g class="d-node" style="--i:2"><rect x="305" y="30" width="150" height="50" rx="10"/><text class="d-text" x="380" y="60" text-anchor="middle">Commit 2</text></g>
+              <g class="d-node accent" style="--i:4"><rect x="590" y="30" width="150" height="50" rx="10"/><text class="d-text" x="665" y="60" text-anchor="middle">Commit 3</text></g>
+              <path class="d-edge" style="--i:3" d="M305 55H175"/><path class="d-arrow" style="--i:3" d="M182 50L174 55L182 60Z"/>
+              <path class="d-edge" style="--i:5" d="M590 55H460"/><path class="d-arrow" style="--i:5" d="M467 50L459 55L467 60Z"/>
+              <text class="d-label" style="--i:3" x="240" y="45" text-anchor="middle">parent</text>
+              <text class="d-label" style="--i:5" x="525" y="45" text-anchor="middle">parent</text>
+              <g class="d-node alt" style="--i:6"><rect x="20" y="150" width="150" height="50" rx="10"/><text class="d-text" x="95" y="180" text-anchor="middle">Snapshot A</text></g>
+              <g class="d-node alt" style="--i:6"><rect x="305" y="150" width="150" height="50" rx="10"/><text class="d-text" x="380" y="180" text-anchor="middle">Snapshot B</text></g>
+              <g class="d-node alt" style="--i:6"><rect x="590" y="150" width="150" height="50" rx="10"/><text class="d-text" x="665" y="180" text-anchor="middle">Snapshot C</text></g>
+              <path class="d-edge" style="--i:7" d="M95 80V150"/><path class="d-arrow" style="--i:7" d="M90 143L95 151L100 143Z"/>
+              <path class="d-edge" style="--i:7" d="M380 80V150"/><path class="d-arrow" style="--i:7" d="M375 143L380 151L385 143Z"/>
+              <path class="d-edge" style="--i:7" d="M665 80V150"/><path class="d-arrow" style="--i:7" d="M660 143L665 151L670 143Z"/>
+              <text class="d-label" style="--i:8" x="380" y="228" text-anchor="middle">unchanged files are shared, not copied</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M665 55H95"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Each commit points at a full snapshot and at its parent. Walking the parents is "viewing history".</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>Does saving a full snapshot every time eat your disk? No, because of the filing rule. If a file didn't change, its fingerprint didn't change, so the new snapshot simply points at the copy already in the cabinet. Only edited files add anything new.</p>
+          <p>A <dfn class="term" title="A movable label pointing at one commit.">branch</dfn> is then almost free. It is a sticky note with a commit's fingerprint on it. Creating one writes a tiny note; no files are copied. Committing just moves the note forward.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Git was built for the Linux kernel, a project with thousands of contributors working at once and no central server they all had to trust. Naming things by their contents means any copy can check itself: if the fingerprints match, the data is right. That is what lets everybody hold a full copy of the history and still agree.</p>
+          <p>The trade-off is that history is permanent by design. You can't quietly edit the past; "rewriting" it really means making new commits with new fingerprints. Also, storing whole snapshots would grow large over time, so Git periodically packs its files and keeps only the <dfn class="term" title="Storing only what changed between versions.">deltas</dfn> between similar ones. You get snapshot thinking with delta-sized disk use.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Git doesn't track changes. It stores snapshots, and works out the changes when you ask.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>This is the simplified picture. Real Git has a few more item types (such as tags), and the hash function it uses is in the middle of a long migration to a newer one. I haven't covered those details, and I haven't checked how any specific hosting site stores repositories on its servers.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Creating a branch feels instant.</strong> It is one tiny label, not a copy of your project.</li>
+            <li><strong>Those long random-looking commit IDs.</strong> They are the fingerprints, and they are the commit's real name.</li>
+            <li><strong>"Rewriting history" breaks teammates' copies.</strong> A rewritten commit has a new fingerprint, so everyone else's copy suddenly disagrees about what the past was.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Pro Git book, <a href="https://git-scm.com/book/en/v2/Git-Internals-Git-Objects">Git Objects</a> and <a href="https://git-scm.com/book/en/v2/Git-Internals-Packfiles">Packfiles</a>; <a href="https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell">Branches in a Nutshell</a>.</p>
+      </div>
+    </article>
+
     <article class="entry" id="2026-10-01-sqlite-one-file" data-topic="SQLite" data-domain="Databases" data-date="2026-10-01">
       <header class="entry-head">
         <div class="entry-meta">
