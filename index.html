@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-03-cloudflare-anycast"><time datetime="2026-10-03">2026-10-03</time><span>Cloudflare: one address, many buildings</span></a></li>
         <li><a href="#2026-10-02-git-snapshots"><time datetime="2026-10-02">2026-10-02</time><span>Git: a filing cabinet named by contents</span></a></li>
         <li><a href="#2026-10-01-sqlite-one-file"><time datetime="2026-10-01">2026-10-01</time><span>SQLite: a whole database in one file</span></a></li>
         <li><a href="#2026-09-30-discord-message-path"><time datetime="2026-09-30">2026-09-30</time><span>Discord: one message, 200,000 readers</span></a></li>
@@ -243,6 +244,88 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-03-cloudflare-anycast" data-topic="Cloudflare anycast" data-domain="Infra" data-date="2026-10-03">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-10-03">3 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">One address, hundreds of buildings: Cloudflare's anycast</h2>
+        <p class="lede">Cloudflare sits in front of a huge share of the web, soaking up traffic and attacks. The design challenge: every visitor needs to reach a nearby machine, and if a building goes dark or a flood of junk traffic arrives, nobody should notice. And ideally nobody has to decide where each visitor goes.</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Anycast</dt><dd>Many machines in many places all claim the same IP address, and each visitor gets sent to whichever one is closest in network terms.</dd></div>
+            <div><dt>IP address</dt><dd>The number that identifies a machine on the internet, a bit like a phone number.</dd></div>
+            <div><dt>Data center</dt><dd>A warehouse full of servers with fast internet connections. Cloudflare has them in hundreds of cities.</dd></div>
+            <div><dt>BGP</dt><dd>The way networks tell each other "you can reach this address through me". It is how the internet's routers learn the map.</dd></div>
+            <div><dt>Router</dt><dd>A machine whose job is to pass internet traffic along, one hop at a time, toward its destination.</dd></div>
+            <div><dt>DDoS attack</dt><dd>Someone aims a flood of fake traffic at a site to knock it over.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Picture a pizza chain with one phone number. You dial it and the phone network connects you to the shop nearest your house. You never pick a shop, and the chain never needs to know where you live.</p>
+          <p>That is <dfn class="term" title="Many machines in many places share one IP address; each visitor is routed to the closest one.">anycast</dfn>. Normally an <dfn class="term" title="The number that identifies a machine on the internet.">IP address</dfn> belongs to one place. With anycast, Cloudflare's <dfn class="term" title="A warehouse of servers with fast internet links.">data centers</dfn> all around the world announce the same address at the same time. They do it using <dfn class="term" title="Border Gateway Protocol: how networks announce which addresses they can reach.">BGP</dfn>, the system networks use to tell each other which addresses they can deliver to.</p>
+          <p>Every <dfn class="term" title="A machine that forwards traffic one hop closer to its destination.">router</dfn> on the way picks the best path it knows. So a visitor in Mumbai tends to end up at a Mumbai building and one in Paris at a Paris building, with no special logic and no lookup table of users.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: two visitors reach different data centers through the same address. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-03-cloudflare-anycast-d1-t 2026-10-03-cloudflare-anycast-d1-d">
+              <title id="2026-10-03-cloudflare-anycast-d1-t">One address, many data centers</title>
+              <desc id="2026-10-03-cloudflare-anycast-d1-d">Two visitors on the left send traffic to the same address. Each is carried by the internet to a different nearby data center on the right, and both data centers announce that same address.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="30" width="140" height="50" rx="10"/><text class="d-text" x="90" y="60" text-anchor="middle">Visitor A</text></g>
+              <g class="d-node" style="--i:0"><rect x="20" y="150" width="140" height="50" rx="10"/><text class="d-text" x="90" y="180" text-anchor="middle">Visitor B</text></g>
+              <path class="d-edge" style="--i:1" d="M160 55H590"/><path class="d-arrow" style="--i:1" d="M583 50L591 55L583 60Z"/>
+              <path class="d-edge" style="--i:1" d="M160 175H590"/><path class="d-arrow" style="--i:1" d="M583 170L591 175L583 180Z"/>
+              <text class="d-label" style="--i:2" x="375" y="45" text-anchor="middle">same destination address</text>
+              <text class="d-label" style="--i:2" x="375" y="165" text-anchor="middle">same destination address</text>
+              <g class="d-node accent" style="--i:3"><rect x="592" y="25" width="150" height="60" rx="10"/><text class="d-text" x="667" y="52" text-anchor="middle">Data center 1</text><text class="d-sub" x="667" y="72" text-anchor="middle">nearest to A</text></g>
+              <g class="d-node accent" style="--i:3"><rect x="592" y="145" width="150" height="60" rx="10"/><text class="d-text" x="667" y="172" text-anchor="middle">Data center 2</text><text class="d-sub" x="667" y="192" text-anchor="middle">nearest to B</text></g>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 55H592"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 175H592"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Both visitors aim at the same address. The internet's own routing decides which building each one reaches.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>Failure handling comes almost for free. If a data center goes dark, it stops announcing the address. Routers elsewhere forget that path, and traffic that used to land there quietly slides to the next-nearest building.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The obvious alternative is to make the website's name point at a different address per region, and have a smart system hand out the right one. That works, but it is slow to react: those answers get remembered by phones and browsers, so a bad answer lingers.</p>
+          <p>Anycast also helps against a <dfn class="term" title="A flood of fake traffic meant to knock a site over.">DDoS attack</dfn>. Attackers are spread across the world, so each building only receives the slice of the flood that is near it, instead of one site taking all of it. The trade-off: "closest" means closest on the network map, which is not always closest on the real one, and if routes shift in the middle of a long conversation, that conversation can land on a different machine and break. Operators put real work into making that rare.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Nobody sends you to the nearest building. The internet's routing just does it.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>This is the simplified picture. Cloudflare has described using more than plain anycast, for example extra layers to spread work among machines inside each building, and I haven't verified the current details of how it does that. I also haven't covered how it treats different customers' traffic differently.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Public DNS like 1.1.1.1 is easy to remember.</strong> One short address works worldwide, because every location answers to it.</li>
+            <li><strong>Big sites survive outages you never hear about.</strong> A failed building just stops announcing itself and traffic flows around it.</li>
+            <li><strong>Attacks rarely take a whole network down.</strong> The flood is chopped up by geography before it reaches any single machine.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Cloudflare's <a href="https://www.cloudflare.com/learning/cdn/glossary/anycast-network/">anycast explainer</a> and <a href="https://blog.cloudflare.com/tag/anycast/">engineering blog posts tagged anycast</a>. Written from background knowledge without re-fetching during this run; treat as starting points.</p>
+      </div>
+    </article>
+
     <article class="entry" id="2026-10-02-git-snapshots" data-topic="Git" data-domain="Dev tools" data-date="2026-10-02">
       <header class="entry-head">
         <div class="entry-meta">
