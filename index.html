@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-04-shazam-fingerprint"><time datetime="2026-10-04">2026-10-04</time><span>Shazam: naming a song from ten noisy seconds</span></a></li>
         <li><a href="#2026-10-03-cloudflare-anycast"><time datetime="2026-10-03">2026-10-03</time><span>Cloudflare: one address, many buildings</span></a></li>
         <li><a href="#2026-10-02-git-snapshots"><time datetime="2026-10-02">2026-10-02</time><span>Git: a filing cabinet named by contents</span></a></li>
         <li><a href="#2026-10-01-sqlite-one-file"><time datetime="2026-10-01">2026-10-01</time><span>SQLite: a whole database in one file</span></a></li>
@@ -244,6 +245,89 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-04-shazam-fingerprint" data-topic="Shazam audio fingerprinting" data-domain="Consumer apps" data-date="2026-10-04">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-10-04">4 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Shazam: naming a song from ten noisy seconds</h2>
+        <p class="lede">You hold your phone up in a loud cafe and a few seconds later it names the song. The design challenge: your recording is full of chatter and clinking cups, it starts at a random moment, and the app has to find a match among tens of millions of tracks almost instantly.</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Audio fingerprint</dt><dd>A small, compact summary of a piece of audio that stays the same even when the audio is noisy or quiet. It is not the sound itself.</dd></div>
+            <div><dt>Frequency</dt><dd>How high or low a sound is. A bass note is a low frequency and a cymbal is a high one.</dd></div>
+            <div><dt>Spectrogram</dt><dd>A picture of a sound with time going left to right and frequency going bottom to top. Brighter spots mean louder.</dd></div>
+            <div><dt>Peak</dt><dd>A spot on the spectrogram that is louder than everything around it.</dd></div>
+            <div><dt>Hash</dt><dd>A short code computed from some data. The same data always gives the same code, so codes can be looked up quickly.</dd></div>
+            <div><dt>Index</dt><dd>A lookup table built ahead of time, so you can jump straight to the entries you want instead of scanning everything.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>The obvious idea is to compare your recording against every song, wave against wave. That fails right away. Your clip has background noise, the phone microphone squashes the sound, and you started recording mid-song.</p>
+          <p>Shazam's approach, described in a 2003 paper by one of its founders, is to throw most of the sound away. First the app turns the clip into a <dfn class="term" title="A picture of sound: time left to right, pitch bottom to top, brightness is loudness.">spectrogram</dfn>. Then it keeps only the <dfn class="term" title="A spot that is louder than its surroundings.">peaks</dfn>, the loudest spots in each small patch of time and <dfn class="term" title="How high or low a sound is.">frequency</dfn>. What remains looks like a scatter of dots, like stars on a night sky.</p>
+          <p>Loud spots are a good thing to keep because they tend to survive noise. A chatty cafe can drown out quiet details, but the strongest notes of the song still poke through.</p>
+          <p>Single dots are not distinctive enough, since many songs share a loud note. So the app links dots in pairs: one dot, plus a few nearby dots that come just after it. Each pair becomes a small code made from the two frequencies and the time gap between them. That code is the <dfn class="term" title="A compact summary of audio that survives noise.">audio fingerprint</dfn>, or really a bag of hundreds of them.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: from a short recording to a matched song. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 200" role="img" aria-labelledby="2026-10-04-shazam-fingerprint-d1-t 2026-10-04-shazam-fingerprint-d1-d">
+              <title id="2026-10-04-shazam-fingerprint-d1-t">From a recording to a song name</title>
+              <desc id="2026-10-04-shazam-fingerprint-d1-d">On the phone, a short recording is reduced to loudest peaks and then to small codes. The codes are sent to a server, which looks them up in a prebuilt index of songs and returns the song with the most consistent matches.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="70" width="130" height="60" rx="10"/><text class="d-text" x="75" y="97" text-anchor="middle">Recording</text><text class="d-sub" x="75" y="117" text-anchor="middle">a few seconds</text></g>
+              <path class="d-edge" style="--i:1" d="M140 100H177"/><path class="d-arrow" style="--i:1" d="M171 95L179 100L171 105Z"/>
+              <g class="d-node" style="--i:2"><rect x="180" y="70" width="130" height="60" rx="10"/><text class="d-text" x="245" y="97" text-anchor="middle">Peaks</text><text class="d-sub" x="245" y="117" text-anchor="middle">loudest dots only</text></g>
+              <path class="d-edge" style="--i:3" d="M310 100H347"/><path class="d-arrow" style="--i:3" d="M341 95L349 100L341 105Z"/>
+              <g class="d-node accent" style="--i:4"><rect x="350" y="70" width="130" height="60" rx="10"/><text class="d-text" x="415" y="97" text-anchor="middle">Codes</text><text class="d-sub" x="415" y="117" text-anchor="middle">sent to server</text></g>
+              <path class="d-edge accent" style="--i:5" d="M480 100H517"/><path class="d-arrow" style="--i:5" d="M511 95L519 100L511 105Z"/>
+              <g class="d-node alt" style="--i:6"><rect x="520" y="70" width="110" height="60" rx="10"/><text class="d-text" x="575" y="97" text-anchor="middle">Index</text><text class="d-sub" x="575" y="117" text-anchor="middle">all songs</text></g>
+              <path class="d-edge" style="--i:7" d="M630 100H657"/><path class="d-arrow" style="--i:7" d="M651 95L659 100L651 105Z"/>
+              <g class="d-node accent" style="--i:8"><rect x="660" y="70" width="90" height="60" rx="10"/><text class="d-text" x="705" y="107" text-anchor="middle">Song</text></g>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M140 100H660"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The phone does the shrinking. Only the small codes travel to the server, not the audio.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>On the server side, every known song went through the same process ahead of time, and all its codes were stored in a giant <dfn class="term" title="A lookup table built in advance so entries can be found without scanning everything.">index</dfn>, keyed by the code. Each stored entry also remembers which song it came from and when in the song it happened.</p>
+          <p>When your codes arrive, each one is looked up and returns a list of songs that contain it. Many are coincidences. The trick is timing. If your clip really is from song X, then the codes line up: every match sits at the same offset, say "your clip starts 73 seconds into the song". Coincidences scatter all over the place. The song with the most matches agreeing on one offset wins.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>This design is shaped by two limits: noise and scale. Keeping only peaks makes the fingerprint tolerant of noise. Using pairs of peaks makes each code specific enough that a lookup returns a short list instead of half the catalogue. And because each lookup is a direct jump into the index, the work does not grow with the number of songs the way a scan would.</p>
+          <p>The trade-off is what it cannot do. Fingerprints identify one specific recording. A live version, a cover, or you humming the tune has different peaks and timings, so it will not match. That is a different, harder problem.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Don't compare the sound. Compare a few loud landmarks and when they happen.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>This follows the published 2003 algorithm. Shazam has surely changed it since, and I don't know the current details such as how its index is stored or how many codes are used. Where the matching happens in the app today (phone versus server) can also differ by feature.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>It works when you start mid-song.</strong> Codes are matched by their gap to each other, not by where your clip began.</li>
+            <li><strong>It can work in a loud room but not for a cover.</strong> Loud peaks survive noise, yet a different performance has different peaks.</li>
+            <li><strong>Results come back fast.</strong> Only compact codes are sent, and each is a direct lookup instead of a scan over the catalogue.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Avery Wang, "An Industrial-Strength Audio Search Algorithm" (ISMIR 2003). Written from background knowledge without re-fetching during this run; treat as a starting point.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-03-cloudflare-anycast" data-topic="Cloudflare anycast" data-domain="Infra" data-date="2026-10-03">
       <header class="entry-head">
         <div class="entry-meta">
