@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-05-node-event-loop"><time datetime="2026-10-05">2026-10-05</time><span>Node.js: one worker, thousands of waiting customers</span></a></li>
         <li><a href="#2026-10-04-shazam-fingerprint"><time datetime="2026-10-04">2026-10-04</time><span>Shazam: naming a song from ten noisy seconds</span></a></li>
         <li><a href="#2026-10-03-cloudflare-anycast"><time datetime="2026-10-03">2026-10-03</time><span>Cloudflare: one address, many buildings</span></a></li>
         <li><a href="#2026-10-02-git-snapshots"><time datetime="2026-10-02">2026-10-02</time><span>Git: a filing cabinet named by contents</span></a></li>
@@ -245,6 +246,89 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-05-node-event-loop" data-topic="Node.js event loop" data-domain="OS/runtime internals" data-date="2026-10-05">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">OS/runtime internals</span>
+          <time datetime="2026-10-05">5 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Node.js: one worker, thousands of waiting customers</h2>
+        <p class="lede">A chat server or API might have ten thousand people connected at once, and most of them are doing nothing at any given moment. The design challenge: how do you serve all of them without paying for ten thousand threads that mostly sit idle?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Thread</dt><dd>One line of work running inside a program. A program can have many threads running at the same time, but each one costs memory and switching between them costs time.</dd></div>
+            <div><dt>Blocking</dt><dd>When a thread has to stop and wait for something slow, like a disk read or a reply from another server, and can do nothing else meanwhile.</dd></div>
+            <div><dt>Event loop</dt><dd>A loop that keeps asking "has anything finished yet?" and, when something has, runs the code that was waiting for it.</dd></div>
+            <div><dt>Callback</dt><dd>A function you hand over saying "run this when the slow thing is done".</dd></div>
+            <div><dt>Operating system (OS)</dt><dd>The software that manages the computer. It handles the network card and the disk, and can tell a program when data has arrived.</dd></div>
+            <div><dt>libuv</dt><dd>The library inside Node.js that runs the event loop and talks to the operating system.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Think about what a web server actually does for one request. It reads a little data, asks a database a question, waits, gets an answer, and sends a reply. Nearly all of the time is waiting. The server's own work takes a tiny slice.</p>
+          <p>The classic approach gives every connection its own <dfn class="term" title="One line of work inside a program.">thread</dfn>. When that thread hits a slow step it is <dfn class="term" title="Stopped, waiting for something slow to finish.">blocked</dfn>, and the other threads carry on. It works, but ten thousand mostly-asleep threads eat a lot of memory.</p>
+          <p>Node.js does something different. It runs your JavaScript on <em>one</em> thread, and that thread never waits. When your code says "read this file" or "query this database", Node hands the job to the <dfn class="term" title="The software that manages the computer, including the network and disk.">operating system</dfn>, along with a <dfn class="term" title="A function to run when the slow thing finishes.">callback</dfn>, and moves on to the next piece of work.</p>
+          <p>Running underneath is the <dfn class="term" title="A loop that checks what has finished and runs the code waiting on it.">event loop</dfn>, built into a library called <dfn class="term" title="The C library inside Node.js that runs the event loop.">libuv</dfn>. It keeps asking the OS "did anything finish?". When a network reply has arrived, it takes the matching callback and runs it on the main thread.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: requests flow through the single JavaScript thread, slow work goes to the OS, and results come back as callbacks. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-05-node-event-loop-d1-t 2026-10-05-node-event-loop-d1-d">
+              <title id="2026-10-05-node-event-loop-d1-t">The event loop hands waiting to the OS</title>
+              <desc id="2026-10-05-node-event-loop-d1-d">Many clients send requests to the single JavaScript thread. When a request needs something slow, the thread hands it to the operating system and keeps going. When the slow work finishes, the result returns to the event loop, which runs the waiting callback on the same thread.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="85" width="140" height="70" rx="10"/><text class="d-text" x="80" y="115" text-anchor="middle">Many clients</text><text class="d-sub" x="80" y="137" text-anchor="middle">requests arrive</text></g>
+              <path class="d-edge" style="--i:1" d="M150 120H267"/><path class="d-arrow" style="--i:1" d="M261 115L269 120L261 125Z"/>
+              <g class="d-node accent" style="--i:2"><rect x="270" y="85" width="210" height="70" rx="10"/><text class="d-text" x="375" y="115" text-anchor="middle">Event loop</text><text class="d-sub" x="375" y="137" text-anchor="middle">one JavaScript thread</text></g>
+              <path class="d-edge accent" style="--i:3" d="M480 105H597"/><path class="d-arrow" style="--i:3" d="M591 100L599 105L591 110Z"/>
+              <text class="d-label" style="--i:3" x="540" y="95" text-anchor="middle">hand off</text>
+              <g class="d-node alt" style="--i:4"><rect x="600" y="85" width="150" height="70" rx="10"/><text class="d-text" x="675" y="115" text-anchor="middle">OS does the wait</text><text class="d-sub" x="675" y="137" text-anchor="middle">network, disk</text></g>
+              <path class="d-edge" style="--i:5" d="M675 155V205H383"/><path class="d-arrow" style="--i:5" d="M389 200L381 205L389 210Z"/>
+              <path class="d-edge" style="--i:5" d="M375 205V163"/><path class="d-arrow" style="--i:5" d="M370 169L375 161L380 169Z"/>
+              <text class="d-label" style="--i:6" x="540" y="228" text-anchor="middle">done: run the callback</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M150 120H270"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M480 105H675V205H375V160"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The JavaScript thread only does quick work. Anything slow is handed off and comes back later as a callback.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>One detail worth knowing: not everything is handed to the OS in the same way. Network connections can be watched efficiently by the OS itself. Some other jobs, like many file operations, are run on a small pool of helper threads that Node keeps behind the scenes. Your own JavaScript still stays on the single main thread either way.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The constraint is that waiting is cheap for the machine but expensive for a thread. A thread reserves memory and has to be scheduled, even when it is asleep. For a program that is mostly waiting on other things, such as a chat server or an API that calls other APIs, that is a lot of overhead for nothing.</p>
+          <p>The trade-off is sharp. Because there is only one JavaScript thread, a slow <em>calculation</em> blocks everyone. If one request spends two seconds crunching numbers, every other connection freezes for those two seconds, since nobody else can get a turn. Node is great at waiting and poor at heavy computing, unless you push that work to separate worker threads or other services.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Don't make a thread wait. Tell the OS what you're waiting for, and keep going.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>This is the simplified picture. The real loop has several phases (timers, I/O, scheduled follow-ups and more) that decide the order callbacks run in, and I have not covered those. The default size of the helper thread pool and exactly which operations use it are details I'm recalling from memory, so check the Node docs before relying on them.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A tiny Node server can hold a huge number of open connections.</strong> Idle connections cost almost nothing because no thread is sitting on each one.</li>
+            <li><strong>One heavy loop can make a whole server unresponsive.</strong> All callbacks share one thread, so a long calculation delays every other request in line.</li>
+            <li><strong>You see callbacks, promises and <code>async</code> everywhere in Node code.</strong> They are how you say "carry on with this when the slow thing is done" instead of stopping to wait.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the Node.js docs page <a href="https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick">The Node.js Event Loop</a> and the <a href="https://docs.libuv.org/">libuv documentation</a>. Written from background knowledge without re-fetching during this run; treat as starting points.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-04-shazam-fingerprint" data-topic="Shazam audio fingerprinting" data-domain="Consumer apps" data-date="2026-10-04">
       <header class="entry-head">
         <div class="entry-meta">
