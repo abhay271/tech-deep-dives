@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-06-dns-lookup"><time datetime="2026-10-06">2026-10-06</time><span>DNS: a phone book nobody owns</span></a></li>
         <li><a href="#2026-10-05-node-event-loop"><time datetime="2026-10-05">2026-10-05</time><span>Node.js: one worker, thousands of waiting customers</span></a></li>
         <li><a href="#2026-10-04-shazam-fingerprint"><time datetime="2026-10-04">2026-10-04</time><span>Shazam: naming a song from ten noisy seconds</span></a></li>
         <li><a href="#2026-10-03-cloudflare-anycast"><time datetime="2026-10-03">2026-10-03</time><span>Cloudflare: one address, many buildings</span></a></li>
@@ -246,6 +247,92 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-06-dns-lookup" data-topic="DNS" data-domain="Protocols" data-date="2026-10-06">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-10-06">6 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">DNS: a phone book nobody owns</h2>
+        <p class="lede">Every time you open a website, your device first has to turn a name like <code>example.com</code> into a numeric address. Billions of devices do this all day, and no single computer holds the whole list. The design challenge: how do you answer that question fast, for everyone, with no central owner?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>IP address</dt><dd>The number that identifies a machine on the internet. Computers use these, not names, to reach each other.</dd></div>
+            <div><dt>DNS</dt><dd>The Domain Name System. The shared system that turns names into IP addresses.</dd></div>
+            <div><dt>Resolver</dt><dd>A helper server, usually run by your internet provider or a company like Google or Cloudflare, that does the looking-up on your behalf.</dd></div>
+            <div><dt>Cache</dt><dd>A saved copy of an earlier answer, kept so the same question does not have to be asked again.</dd></div>
+            <div><dt>TTL</dt><dd>"Time to live". A number attached to an answer saying how long others may keep their saved copy before asking again.</dd></div>
+            <div><dt>UDP</dt><dd>A simple way to send small messages over the internet: fire it off, no handshake first, no promise it arrives.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>When you type <code>example.com</code>, your device needs its <dfn class="term" title="The number that identifies a machine on the internet.">IP address</dfn>. Your device does not go hunting for it. It asks a <dfn class="term" title="A helper server that looks names up on your behalf.">resolver</dfn>, and the resolver does the work.</p>
+          <p>The names in <dfn class="term" title="The Domain Name System, the shared name-to-address lookup.">DNS</dfn> are organised like a tree, read right to left. The resolver starts at the top, at the <em>root</em> servers, and asks who handles <code>.com</code>. A <code>.com</code> server then says who handles <code>example.com</code>. Finally that server, the one the site owner chose, gives the actual address.</p>
+          <p>Each step only points to the next one. No server knows everything, and each one knows only its own slice. That is what lets the system have no central owner: whoever owns a name controls the answers for it.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a resolver asks the root, then the .com server, then the site's own server. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-10-06-dns-lookup-d1-t 2026-10-06-dns-lookup-d1-d">
+              <title id="2026-10-06-dns-lookup-d1-t">How a resolver looks up a name</title>
+              <desc id="2026-10-06-dns-lookup-d1-d">Your device asks a resolver. The resolver asks a root server, which points to a .com server. The resolver asks the .com server, which points to the site's own server. The resolver asks that one and gets the address, then returns it to your device.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="115" width="130" height="70" rx="10"/><text class="d-text" x="75" y="145" text-anchor="middle">Your device</text><text class="d-sub" x="75" y="167" text-anchor="middle">example.com?</text></g>
+              <path class="d-edge" style="--i:1" d="M140 150H227"/><path class="d-arrow" style="--i:1" d="M221 145L229 150L221 155Z"/>
+              <g class="d-node accent" style="--i:2"><rect x="230" y="115" width="130" height="70" rx="10"/><text class="d-text" x="295" y="145" text-anchor="middle">Resolver</text><text class="d-sub" x="295" y="167" text-anchor="middle">does the legwork</text></g>
+              <path class="d-edge accent" style="--i:3" d="M360 60H497"/><path class="d-arrow" style="--i:3" d="M491 55L499 60L491 65Z"/>
+              <path class="d-edge accent" style="--i:4" d="M360 150H497"/><path class="d-arrow" style="--i:4" d="M491 145L499 150L491 155Z"/>
+              <path class="d-edge accent" style="--i:5" d="M360 240H497"/><path class="d-arrow" style="--i:5" d="M491 235L499 240L491 245Z"/>
+              <g class="d-node alt" style="--i:3"><rect x="500" y="30" width="250" height="60" rx="10"/><text class="d-text" x="625" y="57" text-anchor="middle">Root servers</text><text class="d-sub" x="625" y="76" text-anchor="middle">"ask a .com server"</text></g>
+              <g class="d-node alt" style="--i:4"><rect x="500" y="120" width="250" height="60" rx="10"/><text class="d-text" x="625" y="147" text-anchor="middle">.com servers</text><text class="d-sub" x="625" y="166" text-anchor="middle">"ask example.com's server"</text></g>
+              <g class="d-node alt" style="--i:5"><rect x="500" y="210" width="250" height="60" rx="10"/><text class="d-text" x="625" y="237" text-anchor="middle">example.com's server</text><text class="d-sub" x="625" y="256" text-anchor="middle">"the address is …"</text></g>
+              <text class="d-label" style="--i:6" x="295" y="215" text-anchor="middle">answer saved in cache</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M140 150H230"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M360 60H500M360 150H500M360 240H500"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The resolver walks down the tree one step at a time. Each server only says who to ask next, until the last one gives the address.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>That walk would be slow if it happened every time, so the second half of the design is <dfn class="term" title="A saved copy of an earlier answer.">caching</dfn>. The resolver remembers answers. If thousands of people on the same provider look up the same popular site, only the first one triggers the walk. Everyone else gets the saved copy straight away.</p>
+          <p>Each answer comes with a <dfn class="term" title="How long an answer may be kept before asking again.">TTL</dfn>, chosen by the site owner, that says how long the saved copy is allowed to live. Your own device and browser keep a cache too.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Early on, the internet's name list was one file that everyone downloaded from one place. That broke as the network grew: one machine could not serve everybody, and one organisation could not approve every change. DNS was designed to spread both the load and the control around.</p>
+          <p>The trade-off is that you can never be sure an answer is up to date. Caching makes lookups fast, but a cached answer can be stale until its TTL runs out. Site owners pick the TTL: short means changes spread quickly but more lookups; long means fewer lookups but slower changes.</p>
+          <p>This is also why DNS questions traditionally travel over <dfn class="term" title="A simple way to send small messages with no handshake first.">UDP</dfn>. A question and its answer are each tiny, so a full connection handshake would cost more than the lookup itself. If an answer is too big for one small message, the lookup falls back to a more careful connection.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">No one server knows the answer. Everyone knows who to ask next.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>This is the classic picture. Real lookups have extras I have skipped: many copies of each server, security signatures, and newer encrypted ways of asking (such as DNS over HTTPS) that do not use plain UDP. I also did not fetch sources during this run, so treat the details as a starting point.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A site you just moved can look broken for some people but not others.</strong> Different resolvers hold old saved answers until their TTL runs out.</li>
+            <li><strong>Switching your DNS provider can make browsing feel snappier.</strong> A busy resolver is more likely to already have the answer cached, so it skips the walk.</li>
+            <li><strong>When DNS has an outage, it feels like "the internet is down" even though servers are fine.</strong> Without the lookup you have no address to connect to, so nothing starts.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: RFC 1034 and RFC 1035 (the original DNS specifications), and Cloudflare's learning pages on DNS. Written from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
+
     <article class="entry" id="2026-10-05-node-event-loop" data-topic="Node.js event loop" data-domain="OS/runtime internals" data-date="2026-10-05">
       <header class="entry-head">
         <div class="entry-meta">
