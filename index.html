@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-07-maps-routing"><time datetime="2026-10-07">2026-10-07</time><span>Google Maps: the fastest route is a moving target</span></a></li>
         <li><a href="#2026-10-06-dns-lookup"><time datetime="2026-10-06">2026-10-06</time><span>DNS: a phone book nobody owns</span></a></li>
         <li><a href="#2026-10-05-node-event-loop"><time datetime="2026-10-05">2026-10-05</time><span>Node.js: one worker, thousands of waiting customers</span></a></li>
         <li><a href="#2026-10-04-shazam-fingerprint"><time datetime="2026-10-04">2026-10-04</time><span>Shazam: naming a song from ten noisy seconds</span></a></li>
@@ -247,6 +248,85 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-07-maps-routing" data-topic="Google Maps routing" data-domain="Consumer apps" data-date="2026-10-07">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-10-07">7 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Google Maps: the fastest route is a moving target</h2>
+        <p class="lede">You ask for directions across a city and get an answer in a blink, along with an arrival time that is usually right. But the "best" route depends on traffic that is changing right now, and the road network has millions of possible paths. The design challenge: how do you search that huge maze quickly, with costs that keep shifting?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Graph</dt><dd>A map reduced to dots and lines. Dots are junctions, lines are the road pieces between them.</dd></div>
+            <div><dt>Shortest-path search</dt><dd>A method for finding the cheapest way from one dot to another in a graph, where "cheapest" can mean least time.</dd></div>
+            <div><dt>Road segment</dt><dd>One stretch of road between two junctions, treated as a single unit with its own travel time.</dd></div>
+            <div><dt>Shortcut</dt><dd>A precomputed jump that skips over many small roads, such as "from this town to that one, via the highway".</dd></div>
+            <div><dt>Machine-learning model</dt><dd>A program that learns patterns from past examples, here from past traffic, and uses them to make predictions.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine asking a friend the quickest way to the airport. They would not think about every street in the country. They would think: get to the highway, stay on it, then take the airport exit. Maps software does the same, in two steps.</p>
+          <p>First, the road network is turned into a <dfn class="term" title="A map reduced to junctions (dots) and road pieces (lines).">graph</dfn>. Each <dfn class="term" title="One stretch of road between two junctions.">road segment</dfn> gets a cost, usually its predicted travel time. Finding a route then becomes a <dfn class="term" title="Finding the cheapest way between two points in a graph.">shortest-path search</dfn>.</p>
+          <p>Second, the search is helped by work done ahead of time. Big roads are the ones almost every long trip uses, so the system can prepare <dfn class="term" title="A precomputed jump that skips many small roads.">shortcuts</dfn> between important junctions in advance. When you ask for a route, the search only crawls through small streets near your start and end, and leaps across the middle using the shortcuts.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: phones report speeds, a model predicts segment times, the router finds a route using shortcuts. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-07-maps-routing-d1-t 2026-10-07-maps-routing-d1-d">
+              <title id="2026-10-07-maps-routing-d1-t">From traffic to a route</title>
+              <desc id="2026-10-07-maps-routing-d1-d">Phones on the road report how fast they are moving. A prediction model turns this into a travel time for each road segment. The route finder combines those times with precomputed shortcuts and returns a route and arrival time to you.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="85" width="150" height="70" rx="10"/><text class="d-text" x="85" y="115" text-anchor="middle">Phones on roads</text><text class="d-sub" x="85" y="137" text-anchor="middle">"moving slowly here"</text></g>
+              <path class="d-edge" style="--i:1" d="M160 120H207"/><path class="d-arrow" style="--i:1" d="M201 115L209 120L201 125Z"/>
+              <g class="d-node accent" style="--i:2"><rect x="210" y="85" width="160" height="70" rx="10"/><text class="d-text" x="290" y="115" text-anchor="middle">Prediction</text><text class="d-sub" x="290" y="137" text-anchor="middle">time per segment</text></g>
+              <path class="d-edge accent" style="--i:3" d="M370 120H427"/><path class="d-arrow" style="--i:3" d="M421 115L429 120L421 125Z"/>
+              <g class="d-node alt" style="--i:4"><rect x="430" y="85" width="150" height="70" rx="10"/><text class="d-text" x="505" y="115" text-anchor="middle">Route finder</text><text class="d-sub" x="505" y="137" text-anchor="middle">uses shortcuts</text></g>
+              <path class="d-edge" style="--i:5" d="M580 120H627"/><path class="d-arrow" style="--i:5" d="M621 115L629 120L621 125Z"/>
+              <g class="d-node" style="--i:6"><rect x="630" y="85" width="120" height="70" rx="10"/><text class="d-text" x="690" y="115" text-anchor="middle">You</text><text class="d-sub" x="690" y="137" text-anchor="middle">route + ETA</text></g>
+              <text class="d-label" style="--i:7" x="290" y="195" text-anchor="middle">learns from past traffic too</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 120H630"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Live speeds feed a prediction of each road's travel time, and the route finder uses those times plus its shortcuts.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>The arrival time is its own problem. A road that is jammed now may be clear by the time you reach it. So Google's research team has described using a <dfn class="term" title="A program that learns patterns from past examples to make predictions.">machine-learning model</dfn> that looks at current speeds and at how traffic on neighbouring roads usually behaves, to predict what each segment will be like when you get there, not just what it is like now.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>A plain search that crawls every road is far too slow for a whole country, and it would have to be redone for every user. Shortcuts move most of the work to before you ask. The price is that shortcuts are built for one set of costs. If a road's time changes a lot, the shortcuts that rely on it can go stale.</p>
+          <p>That tension is the heart of it: precomputing makes answers instant, while live traffic makes precomputed answers wrong. Real systems balance the two, keeping the preparation based on stable things like road layout and speed limits, and layering live conditions on top.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Do the slow thinking before you are asked, then adjust for what is happening now.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>Google has not published its exact routing method. The shortcut idea is a well-known technique from research on route planning, and I am confident it is the general family, but I cannot say precisely what Google runs today. The traffic-prediction model comes from Google's own research writing. I did not re-fetch sources in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Directions come back almost instantly, even for a trip across the country.</strong> The search only works hard near the start and end; the middle is covered by precomputed shortcuts.</li>
+            <li><strong>Maps can reroute you mid-drive when a crash happens ahead.</strong> New speed reports change the cost of those segments, and the search runs again with the updated costs.</li>
+            <li><strong>The arrival time sometimes changes even though you are on the same road.</strong> The estimate is a prediction about roads still ahead, and it gets revised as conditions shift.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Google DeepMind's blog post on traffic prediction with graph neural networks, and academic work on route planning with precomputed shortcuts (contraction hierarchies). Written from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-06-dns-lookup" data-topic="DNS" data-domain="Protocols" data-date="2026-10-06">
       <header class="entry-head">
         <div class="entry-meta">
