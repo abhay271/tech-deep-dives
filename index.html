@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-08-docker-containers"><time datetime="2026-10-08">2026-10-08</time><span>Docker: a fenced-off process, not a tiny computer</span></a></li>
         <li><a href="#2026-10-07-maps-routing"><time datetime="2026-10-07">2026-10-07</time><span>Google Maps: the fastest route is a moving target</span></a></li>
         <li><a href="#2026-10-06-dns-lookup"><time datetime="2026-10-06">2026-10-06</time><span>DNS: a phone book nobody owns</span></a></li>
         <li><a href="#2026-10-05-node-event-loop"><time datetime="2026-10-05">2026-10-05</time><span>Node.js: one worker, thousands of waiting customers</span></a></li>
@@ -248,6 +249,87 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-08-docker-containers" data-topic="Docker containers" data-domain="OS/runtime internals" data-date="2026-10-08">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">OS/runtime internals</span>
+          <time datetime="2026-10-08">8 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Docker: a "computer" that is really just a fenced-off process</h2>
+        <p class="lede">A teammate sends you an app and says "just run the container." A second later it is running, with its own files, its own network and exactly the software versions it needs, on your laptop. It feels like a tiny virtual computer, but it starts almost instantly. The design challenge: how do you give a program its own private world without paying for a whole second operating system?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Kernel</dt><dd>The core of the operating system. It talks to the hardware and decides which program gets the CPU, memory and files.</dd></div>
+            <div><dt>Container</dt><dd>An ordinary running program that the kernel has been told to isolate from everything else on the machine.</dd></div>
+            <div><dt>Namespace</dt><dd>A Linux feature that gives a program its own private view of something, such as the list of running programs, the network or the file system.</dd></div>
+            <div><dt>Cgroup</dt><dd>A Linux feature that puts a cap on how much CPU and memory a group of programs may use.</dd></div>
+            <div><dt>Image</dt><dd>The packed-up files a container starts from: the app plus the libraries and tools it needs.</dd></div>
+            <div><dt>Layer</dt><dd>One step of an image, holding only the files that changed in that step. Layers are stacked to form the full set of files.</dd></div>
+            <div><dt>Virtual machine</dt><dd>A pretend computer, with its own full operating system, running on top of a real one.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>A <dfn class="term" title="An ordinary running program that the kernel has isolated from the rest of the machine.">container</dfn> is not a small computer. It is a normal program running on your normal <dfn class="term" title="The core of the operating system, which controls hardware, CPU, memory and files.">kernel</dfn>, with two kinds of fences put around it.</p>
+          <p>The first fence controls what it can <em>see</em>. Linux <dfn class="term" title="A kernel feature that gives a program its own private view of something, like running programs, network or files.">namespaces</dfn> let the kernel show a program a filtered version of the machine. Inside the container, the app thinks it is the only program running, has its own network address, and sees its own file system as the whole disk. The same machine can show a different view to every container.</p>
+          <p>The second fence controls what it can <em>use</em>. <dfn class="term" title="A kernel feature that limits how much CPU and memory a group of programs can use.">Cgroups</dfn> set limits, so one container that goes wild cannot eat all the memory and starve its neighbours.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: several containers sharing one kernel, each wrapped by namespaces and cgroups. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-08-docker-containers-d1-t 2026-10-08-docker-containers-d1-d">
+              <title id="2026-10-08-docker-containers-d1-t">Containers share one kernel</title>
+              <desc id="2026-10-08-docker-containers-d1-d">Three containers, each with its own app and files, sit on top of a single shared Linux kernel. Namespaces limit what each container sees and cgroups limit what each can use. The kernel sits on the hardware.</desc>
+              <g class="d-node" style="--i:0"><rect x="30" y="30" width="200" height="90" rx="10"/><text class="d-text" x="130" y="68" text-anchor="middle">Container A</text><text class="d-sub" x="130" y="92" text-anchor="middle">app + its own files</text></g>
+              <g class="d-node" style="--i:1"><rect x="280" y="30" width="200" height="90" rx="10"/><text class="d-text" x="380" y="68" text-anchor="middle">Container B</text><text class="d-sub" x="380" y="92" text-anchor="middle">app + its own files</text></g>
+              <g class="d-node" style="--i:2"><rect x="530" y="30" width="200" height="90" rx="10"/><text class="d-text" x="630" y="68" text-anchor="middle">Container C</text><text class="d-sub" x="630" y="92" text-anchor="middle">app + its own files</text></g>
+              <path class="d-edge accent" style="--i:3" d="M130 120V163"/><path class="d-arrow" style="--i:3" d="M125 157L130 165L135 157Z"/>
+              <path class="d-edge accent" style="--i:3" d="M380 120V163"/><path class="d-arrow" style="--i:3" d="M375 157L380 165L385 157Z"/>
+              <path class="d-edge accent" style="--i:3" d="M630 120V163"/><path class="d-arrow" style="--i:3" d="M625 157L630 165L635 157Z"/>
+              <g class="d-node accent" style="--i:4"><rect x="30" y="165" width="700" height="55" rx="10"/><text class="d-text" x="380" y="190" text-anchor="middle">One shared Linux kernel</text><text class="d-sub" x="380" y="210" text-anchor="middle">namespaces limit what each sees, cgroups limit what each uses</text></g>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M380 120V190"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Every container is just a program talking to the same kernel, each inside its own fences.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>The other half of Docker is how the files get there. A container starts from an <dfn class="term" title="The packed-up files a container starts from: the app plus its libraries and tools.">image</dfn>, and an image is built from stacked <dfn class="term" title="One build step's worth of changed files. Layers are stacked to make the full file set.">layers</dfn>. One layer might be a base set of system files, the next adds a language runtime, the next adds your app. Each layer stores only what changed.</p>
+          <p>Because layers are read-only and shared, ten containers from the same image do not copy the files ten times. They all read the same layers, and each gets a thin writable layer on top for its own changes. Edit a file and only that one file is copied up into your private layer.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The older way to isolate software was a <dfn class="term" title="A pretend computer with its own full operating system, running on a real one.">virtual machine</dfn>: a whole pretend computer, each with its own kernel. That gives very strong separation, but every one carries a full operating system, so it is heavy and slow to boot.</p>
+          <p>Containers trade some of that separation for speed. Since they share the host's kernel, starting one is just starting a program. The cost is that a bug in the shared kernel can matter to every container, and a Linux container needs a Linux kernel underneath. That is the real trade-off: lightweight and fast, versus a thicker wall.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">A container is not a smaller computer. It is a normal program that has been told what it may see and use.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident in the namespace, cgroup and layered-file-system picture; it is how Docker and similar tools work on Linux. Details vary between tools and versions (for example which file-system driver stores layers), and I did not re-fetch sources in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Containers start in about a blink, while virtual machines take a while.</strong> There is no operating system to boot, just a program to launch inside its fences.</li>
+            <li><strong>"Works on my machine" mostly goes away.</strong> The image carries the exact libraries and tools the app was tested with, so the container sees the same files everywhere.</li>
+            <li><strong>Docker on a Mac or Windows laptop quietly runs a small Linux virtual machine.</strong> Containers need a Linux kernel to share, so those systems bring one along.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Linux kernel documentation on namespaces and control groups, and Docker's documentation on images and layers. Written from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-07-maps-routing" data-topic="Google Maps routing" data-domain="Consumer apps" data-date="2026-10-07">
       <header class="entry-head">
         <div class="entry-meta">
