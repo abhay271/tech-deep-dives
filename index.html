@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-09-kafka-log"><time datetime="2026-10-09">2026-10-09</time><span>Kafka: a diary many programs read at their own pace</span></a></li>
         <li><a href="#2026-10-08-docker-containers"><time datetime="2026-10-08">2026-10-08</time><span>Docker: a fenced-off process, not a tiny computer</span></a></li>
         <li><a href="#2026-10-07-maps-routing"><time datetime="2026-10-07">2026-10-07</time><span>Google Maps: the fastest route is a moving target</span></a></li>
         <li><a href="#2026-10-06-dns-lookup"><time datetime="2026-10-06">2026-10-06</time><span>DNS: a phone book nobody owns</span></a></li>
@@ -249,6 +250,86 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-09-kafka-log" data-topic="Apache Kafka" data-domain="Infra" data-date="2026-10-09">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-10-09">9 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Kafka: a diary that many programs read at their own pace</h2>
+        <p class="lede">When you order food or watch a video, dozens of behind-the-scenes programs need to hear about it: billing, recommendations, analytics, fraud checks. Companies like LinkedIn, who built Kafka, needed to move enormous streams of such events between programs without losing any. The design challenge: how do you let many readers consume a firehose of events, each at its own speed, without the sender slowing down?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Event</dt><dd>A small record of something that happened, such as "order 42 was placed".</dd></div>
+            <div><dt>Log</dt><dd>A list where new items are only ever added at the end and old items are never changed.</dd></div>
+            <div><dt>Topic</dt><dd>A named stream of events, such as "orders". Think of it as one log with a label.</dd></div>
+            <div><dt>Partition</dt><dd>One slice of a topic. Splitting a topic into partitions lets several machines share the work.</dd></div>
+            <div><dt>Offset</dt><dd>The position number of an event in a partition. A reader remembers its offset to know where it stopped.</dd></div>
+            <div><dt>Consumer</dt><dd>A program that reads events from a topic.</dd></div>
+            <div><dt>Replica</dt><dd>A backup copy of a partition kept on another machine.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Picture a billing program that is down for ten minutes while orders keep arriving. If the order system sent messages straight to billing, they would be lost, or the order system would have to wait. Kafka sits in the middle instead and simply writes each <dfn class="term" title="A small record of something that happened.">event</dfn> down, in order.</p>
+          <p>The heart of it is a <dfn class="term" title="A list where items are only added at the end and never changed.">log</dfn>. Events are added to the end and are not edited or removed when someone reads them. A named stream is called a <dfn class="term" title="A named stream of events, such as orders.">topic</dfn>, and each topic is cut into <dfn class="term" title="One slice of a topic, spread across machines.">partitions</dfn> so that many machines can share the load. Events with the same key, say the same customer, go to the same partition, so their order is kept.</p>
+          <p>Each <dfn class="term" title="A program that reads events from a topic.">consumer</dfn> keeps its own bookmark, called an <dfn class="term" title="The position number of an event in a partition.">offset</dfn>. Billing is at event 900, analytics is at event 1,200, and neither affects the other. A slow or crashed reader just resumes from its bookmark later.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: producers append to a log, and two consumers read at different positions. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-09-kafka-log-d1-t 2026-10-09-kafka-log-d1-d">
+              <title id="2026-10-09-kafka-log-d1-t">One log, many independent readers</title>
+              <desc id="2026-10-09-kafka-log-d1-d">An order service appends events to the end of a log. Billing and analytics both read the same log, each from its own position.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="95" width="150" height="70" rx="10"/><text class="d-text" x="85" y="125" text-anchor="middle">Order service</text><text class="d-sub" x="85" y="147" text-anchor="middle">adds events</text></g>
+              <path class="d-edge" style="--i:1" d="M160 130H217"/><path class="d-arrow" style="--i:1" d="M211 125L219 130L211 135Z"/>
+              <g class="d-node accent" style="--i:2"><rect x="220" y="95" width="260" height="70" rx="10"/><text class="d-text" x="350" y="125" text-anchor="middle">Topic: orders (a log)</text><text class="d-sub" x="350" y="147" text-anchor="middle">events kept in order</text></g>
+              <path class="d-edge accent" style="--i:3" d="M480 115L567 60"/><path class="d-arrow" style="--i:3" d="M558 60L569 59L563 68Z"/>
+              <path class="d-edge accent" style="--i:3" d="M480 145L567 200"/><path class="d-arrow" style="--i:3" d="M563 192L569 201L558 200Z"/>
+              <g class="d-node alt" style="--i:4"><rect x="570" y="25" width="180" height="70" rx="10"/><text class="d-text" x="660" y="55" text-anchor="middle">Billing</text><text class="d-sub" x="660" y="77" text-anchor="middle">bookmark at 900</text></g>
+              <g class="d-node alt" style="--i:5"><rect x="570" y="165" width="180" height="70" rx="10"/><text class="d-text" x="660" y="195" text-anchor="middle">Analytics</text><text class="d-sub" x="660" y="217" text-anchor="middle">bookmark at 1,200</text></g>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 130H480"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The sender only adds to the log. Each reader tracks its own place in it.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>To survive machine failures, each partition is copied to other machines as <dfn class="term" title="A backup copy of a partition on another machine.">replicas</dfn>. One copy is the leader that takes new writes, and the others follow it. If the leader's machine dies, a follower that is fully caught up takes over.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Appending to the end of a file is one of the fastest things a disk can do, and reading it back in order is fast too. By keeping things as a plain log, Kafka avoids the slow work a normal message queue does, like tracking which message each reader has finished and deleting messages one by one.</p>
+          <p>The trade-off: order is guaranteed only within a partition, not across the whole topic, and a reader that needs to look up one specific event has to go through the log rather than ask a database. Kafka is great at streaming history, not at answering random questions.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">The sender writes once. Every reader keeps its own bookmark.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the log, partition, offset and replica picture; it is the core of Kafka's design. Details such as how leaders are elected differ between versions, and I did not re-fetch sources in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A new feature can read the whole history of events.</strong> Events stay in the log for a set retention time, so a new reader just starts from the beginning.</li>
+            <li><strong>A downstream outage does not lose data or slow the sender.</strong> The log keeps filling, and the reader catches up from its bookmark when it returns.</li>
+            <li><strong>Events about one customer arrive in order, but across customers they may not.</strong> Order is only promised inside a single partition.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Apache Kafka documentation (design section) and Jay Kreps's essay "The Log: What every software engineer should know about real-time data's unifying abstraction". Written from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-08-docker-containers" data-topic="Docker containers" data-domain="OS/runtime internals" data-date="2026-10-08">
       <header class="entry-head">
         <div class="entry-meta">
