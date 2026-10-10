@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-10-redis-memory"><time datetime="2026-10-10">2026-10-10</time><span>Redis: a database that lives in memory</span></a></li>
         <li><a href="#2026-10-09-kafka-log"><time datetime="2026-10-09">2026-10-09</time><span>Kafka: a diary many programs read at their own pace</span></a></li>
         <li><a href="#2026-10-08-docker-containers"><time datetime="2026-10-08">2026-10-08</time><span>Docker: a fenced-off process, not a tiny computer</span></a></li>
         <li><a href="#2026-10-07-maps-routing"><time datetime="2026-10-07">2026-10-07</time><span>Google Maps: the fastest route is a moving target</span></a></li>
@@ -250,6 +251,86 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-10-redis-memory" data-topic="Redis" data-domain="Databases" data-date="2026-10-10">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-10-10">10 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Redis: a database that lives in memory and does one thing at a time</h2>
+        <p class="lede">When you open a busy app, it often needs the same small facts again and again: who you are, what is in your cart, how many likes a post has. Asking a normal database on disk every time would be too slow. Redis answers these in a fraction of a millisecond. The design challenge: how do you stay that fast and still not lose everything when the machine restarts?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Cache</dt><dd>A fast place to keep copies of data that is slow to get elsewhere, so the next request is quick.</dd></div>
+            <div><dt>RAM</dt><dd>The computer's working memory. It is far faster than a disk, but it is wiped when the power goes off.</dd></div>
+            <div><dt>Key-value store</dt><dd>A database where you save a value under a name (the key) and ask for it back by that name.</dd></div>
+            <div><dt>Snapshot</dt><dd>A full copy of all the data at one moment, written to disk.</dd></div>
+            <div><dt>Append-only file</dt><dd>A file where every change is added at the end as one more line, so the data can be rebuilt by replaying it.</dd></div>
+            <div><dt>Eviction</dt><dd>Deleting some stored data on purpose to make room when memory is full.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Redis is a <dfn class="term" title="A database where you store a value under a name and fetch it back by that name.">key-value store</dfn> that keeps everything in <dfn class="term" title="The computer's fast working memory, which is wiped on power loss.">RAM</dfn>. Your app asks "give me the value for <code>cart:42</code>" and gets it straight from memory, with no disk read in the way. That is why it is so often used as a <dfn class="term" title="A fast place holding copies of data that is slow to fetch from elsewhere.">cache</dfn> in front of a slower database.</p>
+          <p>The values are not just text. Redis can hold lists, sets, counters and sorted lists. A game leaderboard, for example, is one sorted list where Redis keeps players ordered by score for you.</p>
+          <p>The second surprising choice: Redis runs your commands one at a time on a single main thread. No two commands ever run at the same moment, so there are no locks and no half-finished updates to worry about. Adding 1 to a counter is always safe, even with thousands of apps hitting it.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: many clients send commands into one queue, one thread runs them against memory, and changes are saved to disk in the background. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-10-redis-memory-d1-t 2026-10-10-redis-memory-d1-d">
+              <title id="2026-10-10-redis-memory-d1-t">Many clients, one thread, data in memory</title>
+              <desc id="2026-10-10-redis-memory-d1-d">Several app servers send commands to Redis. A single thread runs them one by one against data in memory. A background copy of the changes is written to disk.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="95" width="150" height="70" rx="10"/><text class="d-text" x="85" y="125" text-anchor="middle">Many apps</text><text class="d-sub" x="85" y="147" text-anchor="middle">send commands</text></g>
+              <path class="d-edge" style="--i:1" d="M160 130H217"/><path class="d-arrow" style="--i:1" d="M211 125L219 130L211 135Z"/>
+              <g class="d-node accent" style="--i:2"><rect x="220" y="95" width="200" height="70" rx="10"/><text class="d-text" x="320" y="125" text-anchor="middle">One thread</text><text class="d-sub" x="320" y="147" text-anchor="middle">runs one command at a time</text></g>
+              <path class="d-edge accent" style="--i:3" d="M420 130H517"/><path class="d-arrow" style="--i:3" d="M511 125L519 130L511 135Z"/>
+              <g class="d-node alt" style="--i:4"><rect x="520" y="95" width="230" height="70" rx="10"/><text class="d-text" x="635" y="125" text-anchor="middle">Data in RAM</text><text class="d-sub" x="635" y="147" text-anchor="middle">answers in microseconds</text></g>
+              <path class="d-edge" style="--i:5" d="M635 165V198"/><path class="d-arrow" style="--i:5" d="M630 192L635 200L640 192Z"/>
+              <g class="d-node" style="--i:6"><rect x="520" y="200" width="230" height="50" rx="10"/><text class="d-text" x="635" y="230" text-anchor="middle">Disk: saved copy</text></g>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 130H520"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Commands queue up, run one by one against memory, and a copy is saved to disk on the side.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>Memory is wiped on restart, so Redis offers two ways to save to disk. A <dfn class="term" title="A full copy of all data at one moment, written to disk.">snapshot</dfn> writes everything out every so often. An <dfn class="term" title="A file where each change is added as a new line, so data can be rebuilt by replaying it.">append-only file</dfn> adds each change to the end of a file as it happens. Snapshots are compact but can lose the last few minutes; the append-only file loses far less but grows bigger. Many setups use both.</p>
+          <p>To take a snapshot without freezing the app, Redis asks the operating system to make a copy-on-write clone of its own process. The clone sees the data as it was at that instant and writes it to disk, while the original keeps serving requests.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Most of the time in a database goes to waiting: on disks, on locks, on other threads. Memory removes the disk wait. Running one command at a time removes the lock wait, and because each command takes only microseconds, the queue moves faster than you would expect.</p>
+          <p>The trade-offs are real. Memory is expensive, so your data must fit in it, and when it is full Redis must either refuse writes or do <dfn class="term" title="Deleting some data on purpose to free memory.">eviction</dfn>, throwing away older or less-used keys. One slow command on a huge list blocks everyone behind it. And durability is weaker than in a classic database, since the last moments before a crash may be lost.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Fast comes from doing less waiting, not from doing things in parallel.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the in-memory model, the single-threaded command execution and the two persistence options. Newer versions use extra threads for network reading and writing, and some background work, while commands still run on one thread. Exact defaults vary by version, and I did not re-fetch sources in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Apps sometimes show stale data for a moment.</strong> A cache holds a copy, and until it expires or is updated, you may see the old one.</li>
+            <li><strong>Rate limits and like counters rarely go wrong under heavy load.</strong> Each increment is one uninterrupted command, so two requests cannot overwrite each other.</li>
+            <li><strong>A cache restart can make a site briefly slow.</strong> If memory is empty, every request falls through to the slower database until the cache fills again.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Redis documentation (persistence, eviction and the Redis admin pages). Written from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-09-kafka-log" data-topic="Apache Kafka" data-domain="Infra" data-date="2026-10-09">
       <header class="entry-head">
         <div class="entry-meta">
