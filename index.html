@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-11-https-tls"><time datetime="2026-10-11">2026-10-11</time><span>HTTPS: how two strangers agree on a secret in public</span></a></li>
         <li><a href="#2026-10-10-redis-memory"><time datetime="2026-10-10">2026-10-10</time><span>Redis: a database that lives in memory</span></a></li>
         <li><a href="#2026-10-09-kafka-log"><time datetime="2026-10-09">2026-10-09</time><span>Kafka: a diary many programs read at their own pace</span></a></li>
         <li><a href="#2026-10-08-docker-containers"><time datetime="2026-10-08">2026-10-08</time><span>Docker: a fenced-off process, not a tiny computer</span></a></li>
@@ -251,6 +252,84 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-11-https-tls" data-topic="HTTPS / TLS" data-domain="Protocols" data-date="2026-10-11">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-10-11">11 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">HTTPS: how two strangers agree on a secret in public</h2>
+        <p class="lede">When you open your bank's website on café Wi-Fi, everything you send passes through machines you do not trust. Yet nobody nearby can read your password. The design challenge: your browser has never talked to this server before, so how can they agree on a secret key while everyone is listening, and how do you know the server is really your bank?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>TLS</dt><dd>The protocol that sits under HTTPS. It sets up an encrypted, verified connection before any web page is sent.</dd></div>
+            <div><dt>Encryption key</dt><dd>A secret number used to scramble data so that only someone with the same key can unscramble it.</dd></div>
+            <div><dt>Key exchange</dt><dd>A trick that lets two sides end up with the same secret key without ever sending that key across the network.</dd></div>
+            <div><dt>Certificate</dt><dd>A file where a website claims "this is my name and my public key", signed by someone your device already trusts.</dd></div>
+            <div><dt>Certificate authority</dt><dd>An organisation whose job is to check who owns a website's name and then sign its certificate.</dd></div>
+            <div><dt>Digital signature</dt><dd>A value only the owner of a private key can produce, which anyone can check using the matching public key.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Scrambling data is the easy part. Once both sides share one <dfn class="term" title="A secret number used to scramble and unscramble data.">encryption key</dfn>, they can use fast, simple encryption for the whole conversation. The hard part is getting that key onto both sides when you cannot meet in private first.</p>
+          <p>That is what <dfn class="term" title="The protocol under HTTPS that sets up a private, verified connection.">TLS</dfn> does in its first moments, called the handshake. Your browser and the server run a <dfn class="term" title="A method for two sides to build the same secret key without ever sending it.">key exchange</dfn>. Each side picks a throwaway secret number and sends only a number derived from it. Mixing your own secret with the other side's public number gives both of you the same result. A listener sees both public numbers but cannot work out the result. Because the secrets are thrown away afterwards, recording the traffic today does not help if the server is broken into next year.</p>
+          <p>That alone does not prove who you are talking to. An attacker in the middle could run a key exchange with you and another one with the real server. So the server also sends a <dfn class="term" title="A signed statement linking a website name to a public key.">certificate</dfn> and proves it owns it by signing the handshake with its private key, a <dfn class="term" title="A value only the holder of a private key can create, checkable by anyone with the public key.">digital signature</dfn>. Your device checks that the certificate names the site you asked for, and that it was signed by a <dfn class="term" title="An organisation that verifies who owns a website name and signs its certificate.">certificate authority</dfn> your device already trusts. Your operating system and browser ship with a list of these.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: browser and server swap key-exchange numbers, the server adds its certificate, then both use the shared key for encrypted data. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 280" role="img" aria-labelledby="2026-10-11-https-tls-d1-t 2026-10-11-https-tls-d1-d">
+              <title id="2026-10-11-https-tls-d1-t">The TLS handshake in three steps</title>
+              <desc id="2026-10-11-https-tls-d1-d">The browser sends its public number. The server replies with its own number, its certificate and a signature. Both sides then derive the same key and send encrypted data.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="20" width="170" height="70" rx="10"/><text class="d-text" x="95" y="50" text-anchor="middle">Browser</text><text class="d-sub" x="95" y="72" text-anchor="middle">your device</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="580" y="20" width="170" height="70" rx="10"/><text class="d-text" x="665" y="50" text-anchor="middle">Server</text><text class="d-sub" x="665" y="72" text-anchor="middle">the website</text></g>
+              <path class="d-edge" style="--i:1" d="M180 105H575"/><path class="d-arrow" style="--i:1" d="M567 100L577 105L567 110Z"/>
+              <text class="d-label" style="--i:1" x="380" y="97" text-anchor="middle">1. Hello + my public number</text>
+              <path class="d-edge accent" style="--i:2" d="M580 155H185"/><path class="d-arrow" style="--i:2" d="M193 150L183 155L193 160Z"/>
+              <text class="d-label" style="--i:2" x="380" y="147" text-anchor="middle">2. My number + certificate + signature</text>
+              <path class="d-edge" style="--i:3" d="M180 220H575"/><path class="d-arrow" style="--i:3" d="M567 215L577 220L567 225Z"/>
+              <path class="d-edge" style="--i:3" d="M580 240H185"/><path class="d-arrow" style="--i:3" d="M193 235L183 240L193 245Z"/>
+              <text class="d-label" style="--i:3" x="380" y="212" text-anchor="middle">3. Same key on both sides: encrypted data flows</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M180 105H575"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.2;.7;1" calcMode="linear" path="M580 155H185"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.2;.23;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Two messages are enough for both sides to share a key, and for the browser to check who it is talking to.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The two jobs need different tools. Public-key maths (key exchange and signatures) solves the "never met before" problem, but it is slow. Ordinary shared-key encryption is very fast but needs a shared secret. So TLS uses the slow maths briefly, only to set up the key, then switches to the fast kind for everything else.</p>
+          <p>The trade-off is trust. The whole scheme leans on certificate authorities, and if one signs a certificate it should not have, your browser would believe it. Browsers added public logs of issued certificates and short certificate lifetimes to catch and limit such mistakes. Also, the handshake costs a network round trip before any page data moves, which is one reason newer versions of TLS were redesigned to need fewer trips.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Slow maths to agree on a key, fast maths to use it.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the overall shape: key exchange with throwaway secrets, a signed certificate chain, then fast shared-key encryption. I simplified the handshake a lot; real TLS 1.3 has more messages and options, and exact numbers of round trips depend on version and on whether you reconnect to a site you have visited. I did not re-fetch sources in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>The browser warns you when a certificate has expired or names a different site.</strong> Those are exactly the two things it checks: the name, and that a trusted authority signed it.</li>
+            <li><strong>Padlock sites can still be scams.</strong> The certificate proves you reached the owner of that name, not that the owner is honest.</li>
+            <li><strong>Reconnecting to a site you just visited feels faster.</strong> Both sides can reuse what they already agreed, so less of the handshake is repeated.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: RFC 8446 (TLS 1.3) and general background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-10-redis-memory" data-topic="Redis" data-domain="Databases" data-date="2026-10-10">
       <header class="entry-head">
         <div class="entry-meta">
