@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-12-figma-multiplayer"><time datetime="2026-10-12">2026-10-12</time><span>Figma: many cursors, one design</span></a></li>
         <li><a href="#2026-10-11-https-tls"><time datetime="2026-10-11">2026-10-11</time><span>HTTPS: how two strangers agree on a secret in public</span></a></li>
         <li><a href="#2026-10-10-redis-memory"><time datetime="2026-10-10">2026-10-10</time><span>Redis: a database that lives in memory</span></a></li>
         <li><a href="#2026-10-09-kafka-log"><time datetime="2026-10-09">2026-10-09</time><span>Kafka: a diary many programs read at their own pace</span></a></li>
@@ -252,6 +253,80 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-12-figma-multiplayer" data-topic="Figma multiplayer editing" data-domain="Consumer apps" data-date="2026-10-12">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-10-12">12 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Figma: many cursors, one design, no "file locked" message</h2>
+        <p class="lede">In Figma, you and a teammate can drag the same shapes at the same moment and both see the result instantly. The design challenge: both of you are changing the same data from different computers with network delay between you, so how do you avoid ending up with two different versions of the file?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Server as authority</dt><dd>One central server decides the official order of all changes. Everyone else follows its decisions.</dd></div>
+            <div><dt>Last-writer-wins</dt><dd>When two changes hit the same value, the one the server received later is kept and the other is overwritten.</dd></div>
+            <div><dt>Optimistic update</dt><dd>Showing your own change on screen right away, before the server has confirmed it.</dd></div>
+            <div><dt>CRDT</dt><dd>A data structure designed so that many computers can edit copies independently and always merge to the same result, with no central server needed.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Picture a rectangle on the canvas. You change its colour to red. At the same moment, a teammate changes its colour to blue. Somebody has to decide what the rectangle ends up as, and everyone must see the same answer.</p>
+          <p>Figma keeps this simple with a <dfn class="term" title="One central server decides the official order of all changes.">server as authority</dfn>. Every change goes to the server, and the server decides the order. A change is tiny: "object 42, property fill, new value red". Each property of each object is its own little slot. If two people change the same slot, <dfn class="term" title="When two changes hit the same value, the one received later wins.">last-writer-wins</dfn>: whichever arrives at the server second is kept. If you change different slots, such as one person moving a shape and another recolouring it, both changes survive and nothing is lost.</p>
+          <p>Your screen does not wait for the server. Your edit shows up immediately as an <dfn class="term" title="Showing your own change right away, before the server confirms it.">optimistic update</dfn>. If the server's news about someone else's edit touches a slot you have changed and not yet had confirmed, your app ignores that news for now, so your shape does not flicker back and forth. Once the server confirms your change, everything lines up.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: two users send edits to one server, which decides the order and sends the result back to both. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 280" role="img" aria-labelledby="2026-10-12-figma-multiplayer-d1-t 2026-10-12-figma-multiplayer-d1-d">
+              <title id="2026-10-12-figma-multiplayer-d1-t">Two editors and one authoritative server</title>
+              <desc id="2026-10-12-figma-multiplayer-d1-d">Alice and Bob each send an edit to the server. The server picks an order and sends the agreed result back to both of them.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="20" width="170" height="70" rx="10"/><text class="d-text" x="95" y="50" text-anchor="middle">Alice</text><text class="d-sub" x="95" y="72" text-anchor="middle">fill = red</text></g>
+              <g class="d-node" style="--i:0"><rect x="10" y="190" width="170" height="70" rx="10"/><text class="d-text" x="95" y="220" text-anchor="middle">Bob</text><text class="d-sub" x="95" y="242" text-anchor="middle">fill = blue</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="540" y="105" width="200" height="70" rx="10"/><text class="d-text" x="640" y="135" text-anchor="middle">Server</text><text class="d-sub" x="640" y="157" text-anchor="middle">picks the order</text></g>
+              <path class="d-edge" style="--i:1" d="M180 60L535 130"/><path class="d-arrow" style="--i:1" d="M525 130L537 131L529 122Z"/>
+              <path class="d-edge" style="--i:1" d="M180 220L535 150"/><path class="d-arrow" style="--i:1" d="M527 158L537 149L526 148Z"/>
+              <text class="d-label" style="--i:1" x="300" y="95" text-anchor="middle">edits go up</text>
+              <text class="d-label" style="--i:3" x="300" y="255" text-anchor="middle">agreed result goes back down</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M180 60L535 130"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M180 220L535 150"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Edits flow to one server, which fixes their order. Everyone then converges on the same file.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>There is a more general way to do this: a <dfn class="term" title="A data structure that many computers can edit independently and always merge to the same result.">CRDT</dfn>, where no server is needed to settle disagreements. Figma wrote publicly that it looked at those ideas but did not need their full power. A design tool already has a server that stores the file, so using it as the referee is much simpler. It also avoids the extra bookkeeping that fully server-free approaches need.</p>
+          <p>The trade-off is that you accept some lost work: if two people change the exact same property of the same object at once, one change simply loses. For a design file that is fine, because it is obvious on screen and easy to redo. For a bank balance it would not be.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Different slots merge; the same slot, the server's order decides.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the main idea (central server, per-property last-writer-wins, immediate local updates) from Figma's own engineering write-up on multiplayer editing. I left out how things like layer order and text are handled, which need extra care, and I did not re-fetch the article in this run, so details may have changed since.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Your own edits feel instant even on slow Wi-Fi.</strong> Your screen updates first, and the server's confirmation arrives later.</li>
+            <li><strong>Sometimes a colour you set quietly changes to someone else's.</strong> You both hit the same slot, and the server's order picked the winner.</li>
+            <li><strong>You can move a shape while a teammate recolours it and both changes stick.</strong> They live in different slots, so there is nothing to fight over.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Figma's engineering blog post "How Figma's multiplayer technology works" and general background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-11-https-tls" data-topic="HTTPS / TLS" data-domain="Protocols" data-date="2026-10-11">
       <header class="entry-head">
         <div class="entry-meta">
