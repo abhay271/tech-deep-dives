@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-13-postgres-mvcc"><time datetime="2026-10-13">2026-10-13</time><span>Postgres: readers never wait for writers</span></a></li>
         <li><a href="#2026-10-12-figma-multiplayer"><time datetime="2026-10-12">2026-10-12</time><span>Figma: many cursors, one design</span></a></li>
         <li><a href="#2026-10-11-https-tls"><time datetime="2026-10-11">2026-10-11</time><span>HTTPS: how two strangers agree on a secret in public</span></a></li>
         <li><a href="#2026-10-10-redis-memory"><time datetime="2026-10-10">2026-10-10</time><span>Redis: a database that lives in memory</span></a></li>
@@ -253,6 +254,82 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-13-postgres-mvcc" data-topic="Postgres MVCC" data-domain="Databases" data-date="2026-10-13">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-10-13">13 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Postgres: readers never wait for writers</h2>
+        <p class="lede">A busy app runs thousands of queries at once, some reading a row while others change it. The design challenge: how can a database let everyone work at the same time without anyone seeing half-finished changes, and without making readers queue behind writers?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Transaction</dt><dd>A group of reads and writes that the database treats as one unit: either all of it happens or none of it does.</dd></div>
+            <div><dt>Lock</dt><dd>A "do not touch" sign on data. Anyone else who needs it has to wait until the sign comes down.</dd></div>
+            <div><dt>MVCC</dt><dd>Multi-version concurrency control. Instead of overwriting data, the database keeps several versions of a row and shows each transaction the version that was current when it started.</dd></div>
+            <div><dt>Snapshot</dt><dd>The view of the database a transaction gets: everything that was committed when it began, and nothing that happened after.</dd></div>
+            <div><dt>Vacuum</dt><dd>Postgres's background cleaner. It removes old row versions that nobody can see any more.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say you are checking your bank balance in an app while a transfer is changing that same balance. The simple way to stay safe is a <dfn class="term" title="A do-not-touch sign on data; others wait until it is removed.">lock</dfn>: the transfer locks the row, and your read waits. On a busy system, that means lots of people standing in line.</p>
+          <p>Postgres does something different, called <dfn class="term" title="Multi-version concurrency control: keep several versions of a row and show each transaction the one that was current when it started.">MVCC</dfn>. An <code>UPDATE</code> does not overwrite the row. It writes a brand-new version next to the old one and marks the old one as "replaced by transaction 105". Every row version carries the id of the <dfn class="term" title="A group of reads and writes done as one unit: all or nothing.">transaction</dfn> that created it and, if there is one, the id of the transaction that replaced it.</p>
+          <p>When your transaction starts, it gets a <dfn class="term" title="The database as it was when your transaction began: everything committed before, nothing after.">snapshot</dfn>: roughly, a note of which transactions had finished at that moment. Then, for each row, Postgres shows you the newest version that your snapshot is allowed to see. The transfer's new version is invisible to you until it commits and you start a new query. You read the old balance, the transfer writes the new one, and neither blocks the other.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a row has an old and a new version; a reader sees the old one and a writer creates the new one. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 280" role="img" aria-labelledby="2026-10-13-postgres-mvcc-d1-t 2026-10-13-postgres-mvcc-d1-d">
+              <title id="2026-10-13-postgres-mvcc-d1-t">One row, two versions, two transactions</title>
+              <desc id="2026-10-13-postgres-mvcc-d1-d">A reader transaction points at the old version of a row (balance 100). A writer transaction creates a new version (balance 60) next to it. Neither waits for the other.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="20" width="170" height="70" rx="10"/><text class="d-text" x="95" y="50" text-anchor="middle">Reader</text><text class="d-sub" x="95" y="72" text-anchor="middle">started earlier</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="190" width="170" height="70" rx="10"/><text class="d-text" x="95" y="220" text-anchor="middle">Writer</text><text class="d-sub" x="95" y="242" text-anchor="middle">transfers money</text></g>
+              <g class="d-node" style="--i:2"><rect x="520" y="20" width="220" height="70" rx="10"/><text class="d-text" x="630" y="50" text-anchor="middle">Old version</text><text class="d-sub" x="630" y="72" text-anchor="middle">balance 100</text></g>
+              <g class="d-node accent" style="--i:3"><rect x="520" y="190" width="220" height="70" rx="10"/><text class="d-text" x="630" y="220" text-anchor="middle">New version</text><text class="d-sub" x="630" y="242" text-anchor="middle">balance 60</text></g>
+              <path class="d-edge" style="--i:1" d="M180 55L515 55"/><path class="d-arrow" style="--i:1" d="M505 47L517 55L505 63Z"/>
+              <path class="d-edge accent" style="--i:1" d="M180 225L515 225"/><path class="d-arrow" style="--i:1" d="M505 217L517 225L505 233Z"/>
+              <text class="d-label" style="--i:2" x="345" y="42" text-anchor="middle">reads this one</text>
+              <text class="d-label" style="--i:3" x="345" y="212" text-anchor="middle">writes this one</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M180 55L515 55"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M180 225L515 225"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The reader and the writer touch different versions of the same row, so neither has to wait.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Most real workloads read far more than they write, and reads are often slow, such as a report that scans millions of rows. If every read had to block writes (or the other way round), one long report could freeze the whole app. Keeping old versions around turns "wait your turn" into "you each get your own consistent view".</p>
+          <p>The price is clutter. Old versions pile up, and something has to throw them away. That is the job of <dfn class="term" title="Postgres's background cleaner that removes row versions nobody can see any more.">vacuum</dfn>, which runs in the background and frees versions once no running transaction could still need them. Writers still wait for each other if they try to change the very same row, since only one new version can win.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Don't overwrite; add a version, and let each reader pick the one it is allowed to see.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the core idea (row versions tagged with creating and replacing transaction ids, snapshots, vacuum), which is how the Postgres documentation describes it. I simplified how snapshots work and skipped isolation levels, which change when a new snapshot is taken. I did not re-fetch the docs in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A slow report doesn't freeze your app.</strong> It reads its own snapshot and does not hold locks that block writers.</li>
+            <li><strong>A table can grow even when you only update rows.</strong> Each update adds a new version, and the old ones stay until vacuum cleans them up.</li>
+            <li><strong>A transaction left open for hours is a problem.</strong> Its snapshot may still need old versions, so vacuum cannot remove them.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the PostgreSQL documentation chapter on concurrency control and routine vacuuming, plus general background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-12-figma-multiplayer" data-topic="Figma multiplayer editing" data-domain="Consumer apps" data-date="2026-10-12">
       <header class="entry-head">
         <div class="entry-meta">
