@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-14-lsp-editors"><time datetime="2026-10-14">2026-10-14</time><span>VS Code: one Python brain, every editor</span></a></li>
         <li><a href="#2026-10-13-postgres-mvcc"><time datetime="2026-10-13">2026-10-13</time><span>Postgres: readers never wait for writers</span></a></li>
         <li><a href="#2026-10-12-figma-multiplayer"><time datetime="2026-10-12">2026-10-12</time><span>Figma: many cursors, one design</span></a></li>
         <li><a href="#2026-10-11-https-tls"><time datetime="2026-10-11">2026-10-11</time><span>HTTPS: how two strangers agree on a secret in public</span></a></li>
@@ -254,6 +255,80 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-14-lsp-editors" data-topic="Language Server Protocol" data-domain="Dev tools" data-date="2026-10-14">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Dev tools</span>
+          <time datetime="2026-10-14">14 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">VS Code: one Python brain, every editor</h2>
+        <p class="lede">Open a Python file in VS Code and you get red squiggles, autocomplete and "go to definition". Open it in Vim or Emacs and you get the same things. The design challenge: understanding a programming language is hard work, so how do you avoid rewriting that work for every editor and every language?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Language server</dt><dd>A separate program that understands one programming language. It reads your code and answers questions like "what can go after this dot?".</dd></div>
+            <div><dt>LSP</dt><dd>Language Server Protocol. A shared set of messages that editors and language servers agree to use when they talk to each other.</dd></div>
+            <div><dt>JSON-RPC</dt><dd>A simple way to call a function in another program by sending it a small JSON message and getting a JSON reply.</dd></div>
+            <div><dt>Diagnostics</dt><dd>The list of problems a language server finds in your code: errors, warnings and hints. Editors show them as squiggly underlines.</dd></div>
+            <div><dt>Go to definition</dt><dd>Jumping from a name you are reading to the place where it was created.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Suppose you type <code>user.</code> in a Python file and the editor pops up a list of things a user can do. Someone has to know what <code>user</code> is, where it came from and what it can do. That means parsing the code, tracking imports and understanding types. It is a lot of work.</p>
+          <p>Before 2016, each editor did this itself, for each language. Ten editors and twenty languages meant up to two hundred separate pieces of work. Microsoft's answer, created for VS Code, was the <dfn class="term" title="Language Server Protocol: a shared set of messages between editors and language servers.">LSP</dfn>. The language knowledge moves into a separate program, a <dfn class="term" title="A separate program that understands one programming language and answers questions about your code.">language server</dfn>. The editor only has to show things and send questions.</p>
+          <p>The two run as separate processes and talk using <dfn class="term" title="Calling a function in another program by sending it a small JSON message.">JSON-RPC</dfn> messages, often over plain standard input and output. When you type, the editor tells the server what changed. The server keeps its own picture of your project. When you ask for completions, the editor sends "what fits at line 12, column 5?" and gets a list back. The server can also speak up on its own. After your edit, it sends <dfn class="term" title="The problems found in your code, shown as squiggly underlines.">diagnostics</dfn> so the editor can draw the squiggles.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: an editor and a language server exchange questions and answers. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 280" role="img" aria-labelledby="2026-10-14-lsp-editors-d1-t 2026-10-14-lsp-editors-d1-d">
+              <title id="2026-10-14-lsp-editors-d1-t">An editor talking to a language server</title>
+              <desc id="2026-10-14-lsp-editors-d1-d">The editor sends the server what you typed and what you are asking. The server sends back completions and a list of problems.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="105" width="190" height="70" rx="10"/><text class="d-text" x="105" y="135" text-anchor="middle">Editor</text><text class="d-sub" x="105" y="157" text-anchor="middle">shows things</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="550" y="105" width="200" height="70" rx="10"/><text class="d-text" x="650" y="135" text-anchor="middle">Language server</text><text class="d-sub" x="650" y="157" text-anchor="middle">understands the code</text></g>
+              <path class="d-edge" style="--i:1" d="M200 125L545 125"/><path class="d-arrow" style="--i:1" d="M535 117L547 125L535 133Z"/>
+              <path class="d-edge accent" style="--i:3" d="M550 160L205 160"/><path class="d-arrow" style="--i:3" d="M215 152L203 160L215 168Z"/>
+              <text class="d-label" style="--i:2" x="375" y="105" text-anchor="middle">"I typed this" / "what fits here?"</text>
+              <text class="d-label" style="--i:4" x="375" y="195" text-anchor="middle">completions, errors, definitions</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M200 125L545 125"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M550 160L205 160"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The editor knows nothing about Python. It just asks, and the language server answers.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The problem was multiplication. Every editor needed support for every language, and every language wanted to be in every editor. With a shared protocol, a language needs one server and an editor needs one client. Each new language or editor adds one piece of work, not dozens.</p>
+          <p>The price is that everything becomes messages between two programs. That adds a little delay, and the editor can only offer what the protocol describes. A feature nobody has put in the protocol is harder to build. A server also has to cope with code that is half typed and full of errors, because that is what your file looks like most of the time.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Teach the language once, in a server, and let every editor ask it questions.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the main idea (separate server process, JSON-RPC messages, editor sending changes and requests, server sending diagnostics) from the public LSP specification and Microsoft's description of it. I skipped capability negotiation, which lets each side say what it supports, and the exact message names. I did not re-fetch the spec in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A new language often gets good editor support quickly.</strong> One language server covers many editors at once.</li>
+            <li><strong>Squiggles sometimes show up a moment after you stop typing.</strong> The server is a separate process that has to catch up and send its findings back.</li>
+            <li><strong>Autocomplete can feel different from one editor to another.</strong> The server gives the options, but each editor decides how to rank and display them.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the Language Server Protocol specification and Microsoft's overview of it, plus general background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-13-postgres-mvcc" data-topic="Postgres MVCC" data-domain="Databases" data-date="2026-10-13">
       <header class="entry-head">
         <div class="entry-meta">
