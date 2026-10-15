@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-15-bittorrent-swarm"><time datetime="2026-10-15">2026-10-15</time><span>BitTorrent: the more people want it, the faster it gets</span></a></li>
         <li><a href="#2026-10-14-lsp-editors"><time datetime="2026-10-14">2026-10-14</time><span>VS Code: one Python brain, every editor</span></a></li>
         <li><a href="#2026-10-13-postgres-mvcc"><time datetime="2026-10-13">2026-10-13</time><span>Postgres: readers never wait for writers</span></a></li>
         <li><a href="#2026-10-12-figma-multiplayer"><time datetime="2026-10-12">2026-10-12</time><span>Figma: many cursors, one design</span></a></li>
@@ -255,6 +256,84 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-15-bittorrent-swarm" data-topic="BitTorrent" data-domain="Protocols" data-date="2026-10-15">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-10-15">15 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">BitTorrent: the more people want it, the faster it gets</h2>
+        <p class="lede">When a popular file is hosted on one server, every extra downloader makes things slower. BitTorrent flips that: a huge file reaches thousands of people quickly with no big server behind it. The design challenge: how do strangers share pieces of a file without a boss, and without trusting each other?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Peer</dt><dd>Any computer taking part in the sharing. Each peer both downloads and uploads.</dd></div>
+            <div><dt>Swarm</dt><dd>Everyone currently sharing one particular file, all at once.</dd></div>
+            <div><dt>Piece</dt><dd>One small chunk of the file. A big file is cut into many pieces so they can be fetched from different peers.</dd></div>
+            <div><dt>Hash</dt><dd>A short fingerprint computed from some data. If the data changes even slightly, the fingerprint changes completely.</dd></div>
+            <div><dt>Tracker</dt><dd>A small server that only keeps a list of who is in a swarm. It never holds the file itself.</dd></div>
+            <div><dt>Choking</dt><dd>BitTorrent's word for refusing to upload to a peer for now. Peers choke those who give little back.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine a new game update that millions of people want today. If it sits on one company's server, that server's internet connection is the bottleneck. BitTorrent avoids this by cutting the file into many <dfn class="term" title="A small chunk of the file, fetched independently of the others.">pieces</dfn> and letting everyone who has some pieces hand them to everyone who needs them.</p>
+          <p>The group sharing one file is a <dfn class="term" title="Everyone currently sharing one particular file.">swarm</dfn>, and each member is a <dfn class="term" title="A computer in the swarm that both downloads and uploads.">peer</dfn>. To join, you first need a list of other peers. A small server called a <dfn class="term" title="A server that only lists who is in a swarm; it never holds the file.">tracker</dfn> can give you one, and newer setups can find peers through a shared lookup system spread across the peers themselves. Then you connect to a few dozen of them and trade: "which pieces do you have?" "here is piece 7, send me piece 12."</p>
+          <p>You may be wary of downloading from strangers. The answer is that the small <code>.torrent</code> file (or a magnet link) contains a <dfn class="term" title="A short fingerprint of data; any change gives a completely different one.">hash</dfn> for every piece. After a piece arrives, you check it against its hash. A wrong or tampered piece is thrown away and fetched again from someone else. You never have to trust anyone.</p>
+          <p>Peers also try to grab the <em>rarest</em> pieces first, the ones few others have. That spreads every piece through the swarm quickly, so the original source can leave without the file becoming incomplete.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: three peers swap pieces of a file with each other, while a tracker only lists them. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-10-15-bittorrent-swarm-d1-t 2026-10-15-bittorrent-swarm-d1-d">
+              <title id="2026-10-15-bittorrent-swarm-d1-t">Peers swapping pieces</title>
+              <desc id="2026-10-15-bittorrent-swarm-d1-d">A tracker tells peer A who else is in the swarm. Peers A and B then send different pieces directly to each other, and the file never goes through the tracker.</desc>
+              <g class="d-node" style="--i:0"><rect x="280" y="10" width="200" height="60" rx="10"/><text class="d-text" x="380" y="36" text-anchor="middle">Tracker</text><text class="d-sub" x="380" y="57" text-anchor="middle">just a list of peers</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="190" width="200" height="70" rx="10"/><text class="d-text" x="110" y="220" text-anchor="middle">Peer A</text><text class="d-sub" x="110" y="242" text-anchor="middle">has pieces 1, 2</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="550" y="190" width="200" height="70" rx="10"/><text class="d-text" x="650" y="220" text-anchor="middle">Peer B</text><text class="d-sub" x="650" y="242" text-anchor="middle">has pieces 3, 4</text></g>
+              <path class="d-edge" style="--i:1" d="M150 190L290 70"/><path class="d-arrow" style="--i:1" d="M280 72L292 68L286 80Z"/>
+              <text class="d-label" style="--i:2" x="150" y="115" text-anchor="middle">"who else is here?"</text>
+              <path class="d-edge accent" style="--i:3" d="M210 210L545 210"/><path class="d-arrow" style="--i:3" d="M535 202L547 210L535 218Z"/>
+              <path class="d-edge" style="--i:3" d="M550 240L215 240"/><path class="d-arrow" style="--i:3" d="M225 232L213 240L225 248Z"/>
+              <text class="d-label" style="--i:4" x="380" y="280" text-anchor="middle">peers swap pieces directly</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M210 210L545 210"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M550 240L215 240"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The tracker only introduces peers. The actual pieces travel straight between them.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The problem is that a normal server's upload capacity is fixed, so more downloaders means a smaller share each. In a swarm, every new downloader also becomes an uploader, so capacity grows along with demand.</p>
+          <p>That only works if people actually upload. BitTorrent's fix is a tit-for-tat rule: your client mostly uploads to the peers who are uploading to you, and <dfn class="term" title="Refusing to upload to a peer for now.">chokes</dfn> the rest. It also keeps one slot open to try a random newcomer now and then, so new peers can get started. The price: rare or old files with few peers download slowly or stall, and you generally reveal your network address to everyone in the swarm.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Cut the file into pieces, verify each one, and make every downloader an uploader too.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the main design (pieces with hashes, trackers, swarms, rarest-first, tit-for-tat choking), which is described in the original BitTorrent specification. I simplified how peers are found without trackers and how choking decisions are timed, and I left out details that vary between clients. I did not re-fetch the spec in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Popular downloads are fast, obscure ones crawl.</strong> Speed depends on how many peers have the pieces you need.</li>
+            <li><strong>Your download slows when you pause uploading.</strong> Peers choke those who give nothing back.</li>
+            <li><strong>Linux distributions and game patchers offer torrents.</strong> It lets them release big files without paying for a giant server.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the BitTorrent protocol specification (BEP 3) and Bram Cohen's original description, plus general background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-14-lsp-editors" data-topic="Language Server Protocol" data-domain="Dev tools" data-date="2026-10-14">
       <header class="entry-head">
         <div class="entry-meta">
