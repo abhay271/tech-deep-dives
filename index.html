@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-16-uber-h3-hexagons"><time datetime="2026-10-16">2026-10-16</time><span>Uber: the world cut into hexagons</span></a></li>
         <li><a href="#2026-10-15-bittorrent-swarm"><time datetime="2026-10-15">2026-10-15</time><span>BitTorrent: the more people want it, the faster it gets</span></a></li>
         <li><a href="#2026-10-14-lsp-editors"><time datetime="2026-10-14">2026-10-14</time><span>VS Code: one Python brain, every editor</span></a></li>
         <li><a href="#2026-10-13-postgres-mvcc"><time datetime="2026-10-13">2026-10-13</time><span>Postgres: readers never wait for writers</span></a></li>
@@ -256,6 +257,83 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-16-uber-h3-hexagons" data-topic="Uber H3 hexagon grid" data-domain="Consumer apps" data-date="2026-10-16">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-10-16">16 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Uber: the world cut into hexagons</h2>
+        <p class="lede">Uber constantly asks "how many riders and drivers are near here, and what should a ride cost?" for every neighborhood on Earth. The design challenge: how do you turn a round planet into neat, comparable "areas" a computer can count in and look up instantly?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Grid cell</dt><dd>One small, fixed area of the map. Every point on Earth belongs to exactly one cell.</dd></div>
+            <div><dt>Latitude/longitude</dt><dd>The usual pair of numbers for a spot on Earth. Two nearby spots have similar numbers, but "nearby" is awkward to compute from them.</dd></div>
+            <div><dt>H3</dt><dd>A grid system Uber built and released as open source. It covers the whole planet in hexagon-shaped cells.</dd></div>
+            <div><dt>Resolution</dt><dd>How small the cells are. A low resolution means huge cells (a region); a high one means tiny cells (a street corner).</dd></div>
+            <div><dt>Cell ID</dt><dd>A single number that names one cell. It is how the cell is stored and looked up in a database.</dd></div>
+            <div><dt>Surge pricing</dt><dd>Raising prices in an area where riders far outnumber available drivers.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Open the Uber app and you see cars drifting on a map. Behind that, Uber needs to ask area-level questions: how many people are requesting rides around the stadium right now, and how many free drivers are close enough to help? Asking this with raw <dfn class="term" title="Two numbers that say where a spot is on Earth.">latitude and longitude</dfn> is clumsy. There is no quick way to say "everything within this neighborhood" from two floating-point numbers.</p>
+          <p>So Uber chops the planet into <dfn class="term" title="One small, fixed area of the map.">grid cells</dfn>. Every GPS ping from a phone or car is turned into the cell it falls in, and that cell has a single <dfn class="term" title="One number that names one grid cell.">cell ID</dfn>. Counting riders in a neighborhood becomes "count pings with this cell ID", a simple lookup any database does fast.</p>
+          <p>The grid Uber built is called <dfn class="term" title="Uber's open source system that tiles the planet with hexagons.">H3</dfn>, and the cells are hexagons. A hexagon has a nice property that squares lack: every neighbor is the same distance from the center. With squares, the diagonal neighbors are farther away than the side ones, which makes "spread out one step" uneven. With hexagons, the six neighbors are all equally close, so questions like "what's around this cell?" give round, fair-looking answers.</p>
+          <p>Cells also come in sizes. Each <dfn class="term" title="How small the cells are; higher means smaller.">resolution</dfn> level splits every cell into about seven smaller ones that sit roughly inside it. So one cell ID can be zoomed out to its parent (the whole district) or zoomed in to its children (individual blocks), and you pick whichever size suits the question.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a GPS ping becomes a cell ID, then counts are grouped by cell. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-16-uber-h3-hexagons-d1-t 2026-10-16-uber-h3-hexagons-d1-d">
+              <title id="2026-10-16-uber-h3-hexagons-d1-t">From a GPS ping to a price</title>
+              <desc id="2026-10-16-uber-h3-hexagons-d1-d">A phone sends its location, which is converted to a cell ID. Requests and free drivers are counted per cell, and the counts decide the price in that cell.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="80" width="150" height="70" rx="10"/><text class="d-text" x="85" y="110" text-anchor="middle">Phone</text><text class="d-sub" x="85" y="132" text-anchor="middle">sends location</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="210" y="80" width="150" height="70" rx="10"/><text class="d-text" x="285" y="110" text-anchor="middle">Cell ID</text><text class="d-sub" x="285" y="132" text-anchor="middle">which hexagon?</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="410" y="80" width="150" height="70" rx="10"/><text class="d-text" x="485" y="110" text-anchor="middle">Count per cell</text><text class="d-sub" x="485" y="132" text-anchor="middle">riders vs drivers</text></g>
+              <g class="d-node" style="--i:0"><rect x="610" y="80" width="140" height="70" rx="10"/><text class="d-text" x="680" y="110" text-anchor="middle">Price</text><text class="d-sub" x="680" y="132" text-anchor="middle">for that area</text></g>
+              <path class="d-edge" style="--i:1" d="M160 115L205 115"/><path class="d-arrow" style="--i:1" d="M203 108L215 115L203 122Z"/>
+              <path class="d-edge accent" style="--i:2" d="M360 115L405 115"/><path class="d-arrow" style="--i:2" d="M403 108L415 115L403 122Z"/>
+              <path class="d-edge" style="--i:3" d="M560 115L605 115"/><path class="d-arrow" style="--i:3" d="M603 108L615 115L603 122Z"/>
+              <text class="d-label" style="--i:4" x="380" y="200" text-anchor="middle">same cell ID = same neighborhood = easy to group</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 115L750 115"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Once every location is a cell ID, area-level questions become simple counting.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Uber's prices and driver matching react to local supply and demand, and that changes block by block and minute by minute. The company needed one shared way to slice the map so that pricing, forecasting and ETAs all talk about the same areas. Fixed city zones drawn by hand do not scale to the whole world, and they are awkward at the edges. A uniform grid does, and being <dfn class="term" title="Raising prices where riders outnumber drivers.">surge pricing</dfn>-friendly is a big reason hexagons were chosen: smooth, even neighbors mean prices do not jump oddly across a cell border.</p>
+          <p>The trade-off is that you cannot tile a sphere perfectly with hexagons. H3 handles this by laying the grid over a many-faced shape wrapped around the Earth, which forces a few special five-sided cells in the grid (placed so they mostly land in the ocean). Cells are also only approximately the same size, and a child hexagon does not fit exactly inside its parent.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Turn "where exactly?" into "which hexagon?", and a map question becomes a counting question.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about H3's core idea (hexagon cells, multiple resolutions, one ID per cell, parent/child nesting, a few pentagons) and that Uber uses it for marketplace things like demand and pricing. I did not re-check exactly which Uber systems use it today, how many resolutions exist or the precise cell sizes, so I left those numbers out.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Surge prices apply to an area, not to you personally.</strong> Your location maps to a cell, and the price comes from that cell's supply and demand.</li>
+            <li><strong>Walking a block or two can change your price.</strong> You may have crossed into a neighboring cell with a different balance of riders and drivers.</li>
+            <li><strong>Heatmaps of busy areas look like honeycombs.</strong> Each hexagon is just one cell's count, colored by how high it is.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Uber Engineering's H3 announcement and the H3 project documentation (h3geo.org), plus general background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-15-bittorrent-swarm" data-topic="BitTorrent" data-domain="Protocols" data-date="2026-10-15">
       <header class="entry-head">
         <div class="entry-meta">
