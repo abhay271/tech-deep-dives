@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-17-linux-oom-killer"><time datetime="2026-10-17">2026-10-17</time><span>Linux: the computer that promises memory it doesn't have</span></a></li>
         <li><a href="#2026-10-16-uber-h3-hexagons"><time datetime="2026-10-16">2026-10-16</time><span>Uber: the world cut into hexagons</span></a></li>
         <li><a href="#2026-10-15-bittorrent-swarm"><time datetime="2026-10-15">2026-10-15</time><span>BitTorrent: the more people want it, the faster it gets</span></a></li>
         <li><a href="#2026-10-14-lsp-editors"><time datetime="2026-10-14">2026-10-14</time><span>VS Code: one Python brain, every editor</span></a></li>
@@ -257,6 +258,85 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-17-linux-oom-killer" data-topic="Linux memory overcommit and OOM killer" data-domain="OS/runtime internals" data-date="2026-10-17">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">OS/runtime internals</span>
+          <time datetime="2026-10-17">17 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Linux: the computer that promises memory it doesn't have</h2>
+        <p class="lede">Almost every server you use runs Linux, and Linux happily says "yes" when a program asks for more memory than the machine could ever give. The design challenge: what happens when everyone actually tries to use what they were promised?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Virtual memory</dt><dd>The private memory map each program sees. Its addresses are just promises; the operating system decides later which real chip space backs them.</dd></div>
+            <div><dt>Page</dt><dd>A small fixed chunk of memory (commonly 4 KB). The operating system hands memory out one page at a time.</dd></div>
+            <div><dt>Page fault</dt><dd>What happens when a program touches a promised page that has no real memory behind it yet. The operating system steps in and finds some.</dd></div>
+            <div><dt>Overcommit</dt><dd>Promising out more memory in total than the machine physically has, betting that programs won't use it all at once.</dd></div>
+            <div><dt>OOM killer</dt><dd>"Out of memory" killer. A part of the Linux kernel that picks a program and force-stops it when real memory runs out.</dd></div>
+            <div><dt>cgroup</dt><dd>A Linux feature that puts a group of processes under shared limits, such as a maximum amount of memory. Containers like Docker use it.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine a program that asks for 8 GB of memory on a laptop with 4 GB. You might expect an error. On Linux, the request usually succeeds. Nothing has gone wrong yet, because the program has not been given real memory. It has been given <dfn class="term" title="The private memory map each program sees; addresses are promises until used.">virtual memory</dfn>: a range of addresses that exist only on paper.</p>
+          <p>Real memory is handed out later, one small <dfn class="term" title="A small fixed chunk of memory, commonly 4 KB.">page</dfn> at a time, the first time the program actually touches it. That touch causes a <dfn class="term" title="The moment a program touches a page that has no real memory yet, so the OS provides one.">page fault</dfn>, the kernel quietly grabs a free page, and the program carries on without noticing.</p>
+          <p>So the kernel is practising <dfn class="term" title="Promising more memory in total than physically exists.">overcommit</dfn>. By default it refuses only the most absurd requests, such as one far larger than the whole machine could ever hold, and accepts the rest.</p>
+          <p>The bill arrives when too many programs really do use their promises. Free pages run out, the kernel first tries to reclaim memory by dropping cached files, and if that is not enough it calls the <dfn class="term" title="Kernel component that force-stops a process when memory runs out.">OOM killer</dfn>. It scores the processes, mainly by how much memory each one is holding, and stops the worst offender with a hard kill signal. Nobody gets to clean up.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a memory request is promised, pages are given on first use, and when real memory runs out the OOM killer stops a process. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-17-linux-oom-killer-d1-t 2026-10-17-linux-oom-killer-d1-d">
+              <title id="2026-10-17-linux-oom-killer-d1-t">From a memory promise to a kill</title>
+              <desc id="2026-10-17-linux-oom-killer-d1-d">A program asks for memory and gets a promise. It touches pages, and the kernel gives real memory on each first touch. If real memory runs out, the OOM killer stops a process.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="80" width="150" height="70" rx="10"/><text class="d-text" x="85" y="110" text-anchor="middle">Program</text><text class="d-sub" x="85" y="132" text-anchor="middle">asks for 8 GB</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="210" y="80" width="150" height="70" rx="10"/><text class="d-text" x="285" y="110" text-anchor="middle">Promise</text><text class="d-sub" x="285" y="132" text-anchor="middle">just addresses</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="410" y="80" width="150" height="70" rx="10"/><text class="d-text" x="485" y="110" text-anchor="middle">Real pages</text><text class="d-sub" x="485" y="132" text-anchor="middle">given on first touch</text></g>
+              <g class="d-node" style="--i:0"><rect x="610" y="80" width="140" height="70" rx="10"/><text class="d-text" x="680" y="110" text-anchor="middle">OOM killer</text><text class="d-sub" x="680" y="132" text-anchor="middle">when none are left</text></g>
+              <path class="d-edge" style="--i:1" d="M160 115L205 115"/><path class="d-arrow" style="--i:1" d="M203 108L215 115L203 122Z"/>
+              <path class="d-edge accent" style="--i:2" d="M360 115L405 115"/><path class="d-arrow" style="--i:2" d="M403 108L415 115L403 122Z"/>
+              <path class="d-edge" style="--i:3" d="M560 115L605 115"/><path class="d-arrow" style="--i:3" d="M603 108L615 115L603 122Z"/>
+              <text class="d-label" style="--i:4" x="380" y="200" text-anchor="middle">saying yes is free; paying up happens later</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 115L750 115"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The kernel says yes at request time and only pays when pages are touched.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Programs ask for far more memory than they use. A big program may reserve a huge area and touch a fraction of it, and when one program starts a helper, the helper begins as a copy of its parent that shares the same pages until one side changes them. If the kernel demanded real memory for every promise up front, it would refuse perfectly harmless requests and waste most of the machine.</p>
+          <p>The trade-off is honesty. The failure moves from a clean "no" at request time, which a program can handle, to a sudden kill much later, when the program is in the middle of something. Linux does let administrators choose stricter accounting, but the permissive default won, because it keeps real machines busier.</p>
+          <p>Containers add a twist. A <dfn class="term" title="Linux feature that applies shared limits, like a memory cap, to a group of processes.">cgroup</dfn> memory limit works like a small private machine: if the programs inside go over their cap, the kernel kills one of them even though the host has plenty of memory left.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Saying yes costs nothing. The cost shows up when everybody collects.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the overall behaviour: lazy page allocation, default heuristic overcommit, the OOM killer choosing mostly by memory use, and cgroup limits triggering kills. I did not re-check the exact scoring formula or the precise rules for which requests the default mode refuses, since they vary by kernel version and settings.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A program can "allocate" more memory than you own and run fine.</strong> It never touched most of it, so no real memory was used.</li>
+            <li><strong>A container dies with exit code 137 and no error message.</strong> That code means it was force-stopped by a kill signal, often the OOM killer after it hit its memory cap.</li>
+            <li><strong>A server gets slow and stuttery before something vanishes.</strong> The kernel first scrambles to reclaim memory, and only then kills a process.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Linux kernel documentation on overcommit accounting and the OOM killer, plus general background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
+
     <article class="entry" id="2026-10-16-uber-h3-hexagons" data-topic="Uber H3 hexagon grid" data-domain="Consumer apps" data-date="2026-10-16">
       <header class="entry-head">
         <div class="entry-meta">
