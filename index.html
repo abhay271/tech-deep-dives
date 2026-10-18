@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-18-kubernetes-reconcile"><time datetime="2026-10-18">2026-10-18</time><span>Kubernetes: you describe the goal, a loop keeps it true</span></a></li>
         <li><a href="#2026-10-17-linux-oom-killer"><time datetime="2026-10-17">2026-10-17</time><span>Linux: the computer that promises memory it doesn't have</span></a></li>
         <li><a href="#2026-10-16-uber-h3-hexagons"><time datetime="2026-10-16">2026-10-16</time><span>Uber: the world cut into hexagons</span></a></li>
         <li><a href="#2026-10-15-bittorrent-swarm"><time datetime="2026-10-15">2026-10-15</time><span>BitTorrent: the more people want it, the faster it gets</span></a></li>
@@ -258,6 +259,82 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-18-kubernetes-reconcile" data-topic="Kubernetes control loop" data-domain="Infra" data-date="2026-10-18">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-10-18">18 Oct 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Kubernetes: you describe the goal, a loop keeps it true</h2>
+        <p class="lede">Big apps run as many small programs spread over many machines, and machines break all the time. Kubernetes keeps all of that running without a human restarting things at 3 a.m. The design challenge: how do you keep a messy, failing fleet matching what you asked for?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Container</dt><dd>A packaged program that runs fenced off from other programs on the same machine.</dd></div>
+            <div><dt>Node</dt><dd>One machine (physical or virtual) in the cluster that runs containers.</dd></div>
+            <div><dt>Cluster</dt><dd>A group of nodes managed together as if they were one big computer.</dd></div>
+            <div><dt>Desired state</dt><dd>What you want to be true, such as "three copies of my web server should be running". It is a goal, not a list of steps.</dd></div>
+            <div><dt>Controller</dt><dd>A small program that repeatedly compares what is true now with the desired state and acts to close the gap.</dd></div>
+            <div><dt>etcd</dt><dd>A small, reliable database where Kubernetes stores the desired state and the current picture of the cluster.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say your app is a website that needs three copies running so it survives a crash. With Kubernetes you do not say "start a copy on machine 4, then another on machine 7". You write down a goal: "I want three copies of this <dfn class="term" title="A packaged program that runs fenced off from others on the same machine.">container</dfn>." That goal is the <dfn class="term" title="What you want to be true, as a goal rather than steps.">desired state</dfn>, and it is saved in a small database called <dfn class="term" title="Kubernetes' reliable database for desired and current state.">etcd</dfn>.</p>
+          <p>Then a <dfn class="term" title="A small program that compares reality with the desired state and fixes the gap.">controller</dfn> takes over. It runs a never-ending loop: look at what is actually running, compare it with the goal, and fix any difference. Two copies running? Ask for one more. Four? Remove one. It does not care how the gap appeared.</p>
+          <p>Other pieces do the actual placing. A scheduler picks which <dfn class="term" title="One machine in the cluster that runs containers.">node</dfn> has room for the new copy. An agent on that node then starts the container. Each piece does one narrow job, and they coordinate by reading and writing the shared goal, not by calling each other directly.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: the desired state is stored, a controller compares it with what is running and asks for changes, in a loop. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-18-kubernetes-reconcile-d1-t 2026-10-18-kubernetes-reconcile-d1-d">
+              <title id="2026-10-18-kubernetes-reconcile-d1-t">The reconcile loop</title>
+              <desc id="2026-10-18-kubernetes-reconcile-d1-d">You write a goal into the stored state. A controller compares it with what is running on the nodes, asks for a fix when they differ, and then looks again.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="60" width="150" height="70" rx="10"/><text class="d-text" x="85" y="90" text-anchor="middle">Your goal</text><text class="d-sub" x="85" y="112" text-anchor="middle">"3 copies"</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="305" y="60" width="150" height="70" rx="10"/><text class="d-text" x="380" y="90" text-anchor="middle">Controller</text><text class="d-sub" x="380" y="112" text-anchor="middle">goal vs. reality</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="600" y="60" width="150" height="70" rx="10"/><text class="d-text" x="675" y="90" text-anchor="middle">Nodes</text><text class="d-sub" x="675" y="112" text-anchor="middle">running 2 copies</text></g>
+              <path class="d-edge" style="--i:1" d="M160 95L300 95"/><path class="d-arrow" style="--i:1" d="M298 88L310 95L298 102Z"/>
+              <path class="d-edge accent" style="--i:2" d="M455 95L595 95"/><path class="d-arrow" style="--i:2" d="M593 88L605 95L593 102Z"/>
+              <path class="d-edge" style="--i:3" d="M675 130L675 190L380 190L380 135"/><path class="d-arrow" style="--i:3" d="M373 137L380 125L387 137Z"/>
+              <text class="d-label" style="--i:4" x="530" y="215" text-anchor="middle">look again, forever</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 95L675 95"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The controller never "finishes". It keeps comparing and nudging.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>In a <dfn class="term" title="A group of machines managed together as one.">cluster</dfn> of many machines, something is always failing: a node loses power, a container crashes, a network link drops. A script of fixed steps ("start copy, then copy") breaks the moment reality differs from what the script assumed. A loop that only asks "does reality match the goal?" works from whatever state it finds, so it recovers from failures nobody predicted.</p>
+          <p>The trade-off is that the system is <em>eventually</em> right, not instantly right. Between a crash and the fix there is a gap, and a loop that keeps retrying can also keep retrying something that will never work. Kubernetes accepts this: it is simpler and sturdier than trying to handle every failure case by hand.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Don't tell it what to do. Tell it what should be true, and let a loop worry about the rest.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the core idea: declared desired state stored in etcd, controllers reconciling in loops, and the scheduler and node agents as separate narrow components. I kept the component names minimal on purpose, and the real system has many more controllers than this simplified picture shows.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Kill a container by hand and a new one appears.</strong> The loop sees two copies where the goal says three and starts another.</li>
+            <li><strong>A machine can die and the app barely notices.</strong> Its missing copies are just another gap between goal and reality, so they get recreated elsewhere.</li>
+            <li><strong>Changing a number in a file can scale an app.</strong> Edit "3" to "10", and the loop treats the difference as work to do.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Kubernetes documentation on controllers and cluster architecture, plus general background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
+
     <article class="entry" id="2026-10-17-linux-oom-killer" data-topic="Linux memory overcommit and OOM killer" data-domain="OS/runtime internals" data-date="2026-10-17">
       <header class="entry-head">
         <div class="entry-meta">
