@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-19-whatsapp-e2e"><time datetime="2026-10-19">2026-10-19</time><span>WhatsApp: a server that carries messages it cannot read</span></a></li>
         <li><a href="#2026-10-18-kubernetes-reconcile"><time datetime="2026-10-18">2026-10-18</time><span>Kubernetes: you describe the goal, a loop keeps it true</span></a></li>
         <li><a href="#2026-10-17-linux-oom-killer"><time datetime="2026-10-17">2026-10-17</time><span>Linux: the computer that promises memory it doesn't have</span></a></li>
         <li><a href="#2026-10-16-uber-h3-hexagons"><time datetime="2026-10-16">2026-10-16</time><span>Uber: the world cut into hexagons</span></a></li>
@@ -259,6 +260,81 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-19-whatsapp-e2e" data-topic="WhatsApp end-to-end encryption" data-domain="Consumer apps" data-date="2026-10-19">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-10-19">19 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">WhatsApp: a server that carries messages it cannot read</h2>
+        <p class="lede">Every WhatsApp message passes through WhatsApp's servers, yet the company says it cannot read them. The design challenge: how do you send a secret to someone who is offline, using a server you do not trust?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>End-to-end encryption</dt><dd>Messages are scrambled on the sender's phone and only unscrambled on the receiver's phone. Anything in the middle sees noise.</dd></div>
+            <div><dt>Key</dt><dd>A secret number used to scramble or unscramble data. Whoever has the right key can read the message.</dd></div>
+            <div><dt>Public / private key pair</dt><dd>Two linked keys. The public one can be shared with anyone and is used to start a secret; the private one never leaves your phone.</dd></div>
+            <div><dt>Prekey</dt><dd>A public key you upload to the server ahead of time, so others can start a secret conversation with you while you are offline.</dd></div>
+            <div><dt>Ratchet</dt><dd>A step that creates a fresh key from the old one and cannot be run backwards. Used so that each message gets its own key.</dd></div>
+            <div><dt>Forward secrecy</dt><dd>Stealing today's keys does not let anyone read yesterday's messages, because old keys are already gone.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>You message a friend whose phone is off. How can your phone agree on a secret with theirs, if they are not there to answer? The trick is that your friend's phone did some homework earlier. When WhatsApp was installed, it made a <dfn class="term" title="Two linked keys: a public one to share and a private one to keep.">public and private key pair</dfn>, kept the private half, and uploaded the public halves to WhatsApp's server. These include a batch of single-use <dfn class="term" title="A public key uploaded in advance so others can start a secret with you while you are offline.">prekeys</dfn>.</p>
+          <p>Your phone downloads one of those public keys, mixes it with its own keys, and both sides can arrive at the same shared secret without it ever being sent. Your friend's phone repeats the same math when it comes back online. The server only handed over public keys, which are useless for reading anything.</p>
+          <p>After that, each message is protected by a <dfn class="term" title="A one-way step that makes a new key from the old one.">ratchet</dfn>. Every message is locked with a new <dfn class="term" title="A secret number used to scramble or unscramble data.">key</dfn> made from the previous one, and the old key is thrown away. This is the Signal Protocol, which WhatsApp adopted in 2016 with the Signal team's help.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: your phone fetches a public key from the server, then sends encrypted messages through the server to your friend's phone. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-19-whatsapp-e2e-d1-t 2026-10-19-whatsapp-e2e-d1-d">
+              <title id="2026-10-19-whatsapp-e2e-d1-t">Messages through a server that cannot read them</title>
+              <desc id="2026-10-19-whatsapp-e2e-d1-d">Your phone gets a public key from the server, then sends an encrypted message through the server to your friend's phone, which holds the private key and can decrypt it.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="60" width="150" height="70" rx="10"/><text class="d-text" x="85" y="90" text-anchor="middle">Your phone</text><text class="d-sub" x="85" y="112" text-anchor="middle">locks the message</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="305" y="60" width="150" height="70" rx="10"/><text class="d-text" x="380" y="90" text-anchor="middle">Server</text><text class="d-sub" x="380" y="112" text-anchor="middle">sees only noise</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="600" y="60" width="150" height="70" rx="10"/><text class="d-text" x="675" y="90" text-anchor="middle">Friend's phone</text><text class="d-sub" x="675" y="112" text-anchor="middle">unlocks it</text></g>
+              <path class="d-edge" style="--i:1" d="M160 95L300 95"/><path class="d-arrow" style="--i:1" d="M298 88L310 95L298 102Z"/>
+              <path class="d-edge accent" style="--i:2" d="M455 95L595 95"/><path class="d-arrow" style="--i:2" d="M593 88L605 95L593 102Z"/>
+              <path class="d-edge" style="--i:3" d="M675 130L675 190L380 190L380 135"/><path class="d-arrow" style="--i:3" d="M373 137L380 125L387 137Z"/>
+              <text class="d-label" style="--i:4" x="530" y="215" text-anchor="middle">public key, uploaded earlier</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 95L675 95"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The server stores public keys and carries locked messages. It never holds anything that can unlock them.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Phones are offline all the time, so a server has to hold messages until the receiver shows up. If the server could also read them, a hack, a leak or a legal order against the company would expose everyone's chats. Putting the private keys only on the phones removes that risk by design, not by promise.</p>
+          <p>The ratchet adds <dfn class="term" title="Stealing today's keys does not reveal past messages.">forward secrecy</dfn>: if someone steals your phone's keys today, the keys from last month are already deleted, so old captured traffic stays unreadable. The cost is that the phones carry more work and state, and WhatsApp cannot search or restore your chats from the server. That is why chat backups are a separate, optional feature.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">The server is a post office that handles locked boxes and never owns a key.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident in the overall shape: prekeys uploaded to the server, a shared secret set up from public keys, a per-message ratchet, and the Signal Protocol being used since 2016. I left out group chats (which use a related but different scheme) and the exact key types. This run relied on well-known public descriptions of the protocol and WhatsApp's security whitepaper, which I did not re-fetch.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Messages still arrive after your friend was offline for hours.</strong> The server holds the locked message until their phone connects.</li>
+            <li><strong>A new phone cannot read your old chats on its own.</strong> The keys lived on the old phone, so history only returns through a backup you chose to make.</li>
+            <li><strong>"Security code changed" notices appear.</strong> When a contact reinstalls the app, their keys change, and your phone tells you so you can notice a possible impostor.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: WhatsApp Encryption Overview whitepaper and Signal Protocol documentation (X3DH and Double Ratchet), from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-18-kubernetes-reconcile" data-topic="Kubernetes control loop" data-domain="Infra" data-date="2026-10-18">
       <header class="entry-head">
         <div class="entry-meta">
