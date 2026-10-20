@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-20-dynamodb-partitions"><time datetime="2026-10-20">2026-10-20</time><span>DynamoDB: a database that never has a busiest machine</span></a></li>
         <li><a href="#2026-10-19-whatsapp-e2e"><time datetime="2026-10-19">2026-10-19</time><span>WhatsApp: a server that carries messages it cannot read</span></a></li>
         <li><a href="#2026-10-18-kubernetes-reconcile"><time datetime="2026-10-18">2026-10-18</time><span>Kubernetes: you describe the goal, a loop keeps it true</span></a></li>
         <li><a href="#2026-10-17-linux-oom-killer"><time datetime="2026-10-17">2026-10-17</time><span>Linux: the computer that promises memory it doesn't have</span></a></li>
@@ -260,6 +261,83 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-20-dynamodb-partitions" data-topic="Amazon DynamoDB" data-domain="Databases" data-date="2026-10-20">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-10-20">20 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">DynamoDB: a database that never has a busiest machine</h2>
+        <p class="lede">Shopping carts, game scores and streaming histories are tiny lookups repeated by millions of people at once. No single computer can hold or serve all of that. The design challenge: how do you spread one database over thousands of machines and still answer in a few milliseconds?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Partition key</dt><dd>The one field you choose, like a user ID, that decides where a row of data lives.</dd></div>
+            <div><dt>Hash</dt><dd>A fixed recipe that turns any value into a scrambled-looking number. The same input always gives the same number.</dd></div>
+            <div><dt>Partition</dt><dd>One slice of the table, stored on its own machines. A big table is many partitions.</dd></div>
+            <div><dt>Replica</dt><dd>A copy of a partition kept on a different machine, so one failure loses nothing.</dd></div>
+            <div><dt>Leader</dt><dd>The one replica of a partition that accepts writes first and passes them to the others.</dd></div>
+            <div><dt>Eventually consistent read</dt><dd>A read that may come from a replica that has not yet received the very latest write. It is usually correct within moments.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine a table of a hundred million users. DynamoDB, Amazon's database service, asks you to pick a <dfn class="term" title="The field that decides where a row lives, such as a user ID.">partition key</dfn>, say <code>user_id</code>. When you save a row, DynamoDB runs the key through a <dfn class="term" title="A fixed recipe that turns any value into a scrambled-looking number.">hash</dfn>, and the resulting number decides which <dfn class="term" title="One slice of the table, stored on its own machines.">partition</dfn> holds the row. Users spread out evenly, because the hash scrambles neighbours like user 1001 and 1002 into different places.</p>
+          <p>Reading is just as direct. A request arrives at a front-door server, which hashes the key, looks up which machines own that partition, and sends the request straight there. No searching, no asking every machine. That is why the speed stays about the same whether the table has a thousand rows or a trillion.</p>
+          <p>Each partition is copied onto three <dfn class="term" title="A copy of a partition on a different machine.">replicas</dfn> in separate data centers. One is the <dfn class="term" title="The replica that takes each write first and passes it on to the others.">leader</dfn>. A write counts as saved once the leader and at least one other replica have it, so losing a single machine or even a whole building does not lose your data.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a request is hashed to pick a partition, and the partition's leader copies the write to two other replicas. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-20-dynamodb-partitions-d1-t 2026-10-20-dynamodb-partitions-d1-d">
+              <title id="2026-10-20-dynamodb-partitions-d1-t">From request to replicas</title>
+              <desc id="2026-10-20-dynamodb-partitions-d1-d">A request goes to a front-door server that hashes the key and picks a partition. The partition's leader copies the write to two other replicas.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="95" width="150" height="70" rx="10"/><text class="d-text" x="85" y="125" text-anchor="middle">Front door</text><text class="d-sub" x="85" y="147" text-anchor="middle">hashes the key</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="305" y="95" width="150" height="70" rx="10"/><text class="d-text" x="380" y="125" text-anchor="middle">Leader</text><text class="d-sub" x="380" y="147" text-anchor="middle">owns this slice</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="600" y="20" width="150" height="70" rx="10"/><text class="d-text" x="675" y="50" text-anchor="middle">Replica B</text><text class="d-sub" x="675" y="72" text-anchor="middle">other building</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="600" y="170" width="150" height="70" rx="10"/><text class="d-text" x="675" y="200" text-anchor="middle">Replica C</text><text class="d-sub" x="675" y="222" text-anchor="middle">third building</text></g>
+              <path class="d-edge" style="--i:1" d="M160 130L300 130"/><path class="d-arrow" style="--i:1" d="M298 123L310 130L298 137Z"/>
+              <path class="d-edge accent" style="--i:2" d="M455 115L520 115L520 55L595 55"/><path class="d-arrow" style="--i:2" d="M593 48L605 55L593 62Z"/>
+              <path class="d-edge accent" style="--i:2" d="M455 145L520 145L520 205L595 205"/><path class="d-arrow" style="--i:2" d="M593 198L605 205L593 212Z"/>
+              <text class="d-label" style="--i:3" x="232" y="118" text-anchor="middle">write</text>
+              <text class="d-label" style="--i:4" x="520" y="132" text-anchor="middle">copy</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 130L300 130L380 130L520 115L520 55L595 55"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The key alone decides where the data lives, so every request goes straight to the right machines.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The big goal is predictable speed at any size. If finding a row ever required looking at many machines, then adding data would slow every request. By letting you look things up only by key, DynamoDB gives up the flexible questions a classic database allows ("find all users in Chile who signed up last week") in exchange for one fast, cheap path.</p>
+          <p>It also lets the system grow without drama. When a partition gets too big or too busy, DynamoDB splits it in two and moves the halves to new machines, while the table stays online. The catch is that you must choose your key well. If everyone reads the same key, a "hot" partition gets all the traffic, and spreading the table out does not help that one key.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Pick the key carefully: it decides both where your data lives and how well the load spreads.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about hashing the key to a partition, three replicas across data centers with a leader, and partitions splitting as tables grow. I am less sure of the exact write-acknowledgement details, so I described it loosely as "the leader plus at least one other replica", and I left out how DynamoDB tracks which machines own which partition.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Reads can be "strongly" or "eventually" consistent.</strong> Asking the leader gives the newest value; asking any replica is cheaper and faster but might lag a moment behind. This is the <dfn class="term" title="A read that may come from a replica that has not yet received the very latest write.">eventually consistent read</dfn> trade-off.</li>
+            <li><strong>Queries are limited to the key you chose.</strong> Looking up by anything else would mean asking every partition, so you design your table around the questions you will ask.</li>
+            <li><strong>Apps stay fast on Prime Day.</strong> Traffic spreads over many partitions, and busy ones are split, so no single machine becomes the bottleneck.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the 2022 USENIX ATC paper "Amazon DynamoDB: A Scalable, Predictably Performant, and Fully Managed NoSQL Database Service" and AWS documentation, from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-19-whatsapp-e2e" data-topic="WhatsApp end-to-end encryption" data-domain="Consumer apps" data-date="2026-10-19">
       <header class="entry-head">
         <div class="entry-meta">
