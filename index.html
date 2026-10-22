@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-22-netflix-open-connect"><time datetime="2026-10-22">2026-10-22</time><span>Netflix: the movie you press play on is already down the street</span></a></li>
         <li><a href="#2026-10-21-python-gil"><time datetime="2026-10-21">2026-10-21</time><span>Python: eight cores, but only one thread runs at a time</span></a></li>
         <li><a href="#2026-10-20-dynamodb-partitions"><time datetime="2026-10-20">2026-10-20</time><span>DynamoDB: a database that never has a busiest machine</span></a></li>
         <li><a href="#2026-10-19-whatsapp-e2e"><time datetime="2026-10-19">2026-10-19</time><span>WhatsApp: a server that carries messages it cannot read</span></a></li>
@@ -262,6 +263,84 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-22-netflix-open-connect" data-topic="Netflix Open Connect" data-domain="Consumer apps" data-date="2026-10-22">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-10-22">22 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Netflix: the movie you press play on is already down the street</h2>
+        <p class="lede">On a Friday night, millions of people press play within the same hour, and almost all of them want a handful of popular shows. Streaming video is heavy, and sending it all from a few big data centers would clog the internet. The design challenge: how do you put the video physically close to every viewer before they ask for it?</p>
+      </header>
+
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>ISP</dt><dd>Internet service provider: the company you pay for home internet, like Comcast or Jio.</dd></div>
+            <div><dt>CDN</dt><dd>Content delivery network: a set of servers spread around the world that keep copies of popular files near the people who want them.</dd></div>
+            <div><dt>Open Connect</dt><dd>Netflix's own CDN, made of Netflix-owned storage servers placed inside or next to ISPs.</dd></div>
+            <div><dt>Control plane</dt><dd>The part of a system that makes decisions (who is logged in, which server should help you). It does not carry the heavy data itself.</dd></div>
+            <div><dt>Cache</dt><dd>A nearby copy of something so you do not have to fetch it from far away each time.</dd></div>
+            <div><dt>Fill</dt><dd>Copying new or updated video onto the servers near viewers, done in advance rather than when someone asks.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Netflix splits its world into two jobs. The first job is deciding things: logging you in, showing the home page, picking what to recommend. That runs in the cloud (Netflix uses Amazon's data centers for this). The second job is moving video bytes, and that is done by a separate system called <dfn class="term" title="Netflix's own CDN: storage servers placed inside or next to ISPs.">Open Connect</dfn>.</p>
+          <p>Open Connect is a <dfn class="term" title="A set of servers around the world holding copies of popular files near viewers.">CDN</dfn> that Netflix built itself. It consists of purpose-built servers that Netflix offers to place for free inside the networks of <dfn class="term" title="Internet service provider: the company that sells you home internet.">ISPs</dfn>. When you press play, the cloud side checks who you are, then hands your app a list of nearby Open Connect servers. Your app downloads the video straight from one of them. The data may travel only a few network hops instead of crossing a continent.</p>
+          <p>The clever part is when the video gets there. Netflix does not wait for a viewer to ask and then <dfn class="term" title="A nearby copy of something to avoid fetching it from far away.">cache</dfn> it on the way. It knows its catalog and has a good idea of what each region will watch, so overnight, when the network is quiet, it <dfn class="term" title="Copying video onto servers near viewers ahead of time.">fills</dfn> the local servers with the files expected to be popular tomorrow.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: the app asks the cloud which server to use, then downloads video from a server inside the local ISP, which was filled overnight. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 280" role="img" aria-labelledby="2026-10-22-netflix-open-connect-d1-t 2026-10-22-netflix-open-connect-d1-d">
+              <title id="2026-10-22-netflix-open-connect-d1-t">Deciding in the cloud, streaming from nearby</title>
+              <desc id="2026-10-22-netflix-open-connect-d1-d">The viewer's app asks the Netflix cloud where to stream from. The cloud answers with a nearby server. The app then downloads video from that server inside the local ISP, which was filled overnight from Netflix's origin storage.</desc>
+              <g class="d-node" style="--i:0"><rect x="10" y="105" width="150" height="70" rx="10"/><text class="d-text" x="85" y="135" text-anchor="middle">Your app</text><text class="d-sub" x="85" y="157" text-anchor="middle">press play</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="305" y="10" width="150" height="70" rx="10"/><text class="d-text" x="380" y="40" text-anchor="middle">Netflix cloud</text><text class="d-sub" x="380" y="62" text-anchor="middle">decides, no video</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="305" y="105" width="150" height="70" rx="10"/><text class="d-text" x="380" y="135" text-anchor="middle">Server in your ISP</text><text class="d-sub" x="380" y="157" text-anchor="middle">holds the video</text></g>
+              <g class="d-node" style="--i:0"><rect x="600" y="105" width="150" height="70" rx="10"/><text class="d-text" x="675" y="135" text-anchor="middle">Origin storage</text><text class="d-sub" x="675" y="157" text-anchor="middle">fills it at night</text></g>
+              <path class="d-edge" style="--i:1" d="M85 105L85 45L300 45"/><path class="d-arrow" style="--i:1" d="M298 38L310 45L298 52Z"/>
+              <path class="d-edge accent" style="--i:2" d="M160 140L300 140"/><path class="d-arrow" style="--i:2" d="M298 133L310 140L298 147Z"/>
+              <path class="d-edge" style="--i:3" d="M595 140L460 140"/><path class="d-arrow" style="--i:3" d="M462 133L450 140L462 147Z"/>
+              <text class="d-label" style="--i:1" x="190" y="35" text-anchor="middle">1. who serves me?</text>
+              <text class="d-label" style="--i:2" x="230" y="125" text-anchor="middle">2. video</text>
+              <text class="d-label" style="--i:3" x="527" y="125" text-anchor="middle">overnight</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M300 140L160 140"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Decisions come from the cloud, but the heavy video comes from a box in your own ISP.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Video is the heaviest traffic on the internet, and Netflix's traffic is very predictable: the same popular titles, at the same evening hours. That predictability is what makes pre-filling worth it. Moving the files once at 4am, when links are idle, is far cheaper than moving them again for every viewer at 8pm when links are busiest.</p>
+          <p>It helps both sides. The ISP no longer has to pull the same movie across its expensive outside links thousands of times, so it saves money. Netflix gets a smoother stream because the path is short and under less strain. Keeping the control plane separate also means the smart, changing part (recommendations, steering) can live in the cloud, while the video part stays a simple job: serve big files fast from disks.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Netflix does not rush the movie to you when you press play. It put it nearby hours earlier.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the overall split (cloud decides, Open Connect servers deliver), about servers being placed inside ISPs, and about off-peak pre-filling. I have not re-checked the details of how Netflix currently ranks which server to hand you, or how many titles each server holds, and those change over time, so I left them out.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Browsing is sometimes slow while the video itself is crisp.</strong> They come from different systems: the menus come from the cloud, the video from a nearby server.</li>
+            <li><strong>A brand-new niche show can start slower than a hit.</strong> Popular titles are already sitting nearby; rare ones may have to be fetched from farther away.</li>
+            <li><strong>Big premieres do not melt the internet.</strong> The video was copied near viewers beforehand, so the evening rush is served locally.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Netflix Open Connect public overview, from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-21-python-gil" data-topic="Python GIL" data-domain="OS/runtime internals" data-date="2026-10-21">
       <header class="entry-head">
         <div class="entry-meta">
