@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-23-quic-http3"><time datetime="2026-10-23">2026-10-23</time><span>QUIC: one lost packet should not freeze the whole page</span></a></li>
         <li><a href="#2026-10-22-netflix-open-connect"><time datetime="2026-10-22">2026-10-22</time><span>Netflix: the movie you press play on is already down the street</span></a></li>
         <li><a href="#2026-10-21-python-gil"><time datetime="2026-10-21">2026-10-21</time><span>Python: eight cores, but only one thread runs at a time</span></a></li>
         <li><a href="#2026-10-20-dynamodb-partitions"><time datetime="2026-10-20">2026-10-20</time><span>DynamoDB: a database that never has a busiest machine</span></a></li>
@@ -263,6 +264,87 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-23-quic-http3" data-topic="QUIC and HTTP/3" data-domain="Protocols" data-date="2026-10-23">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-10-23">23 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">QUIC: one lost packet should not freeze the whole page</h2>
+        <p class="lede">A web page is dozens of separate files: images, scripts, styles. Your phone fetches them over a flaky Wi-Fi or mobile connection where packets get lost and you walk from Wi-Fi to 5G mid-load. The design challenge: how do you keep a page loading smoothly when the network underneath it is messy?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Packet</dt><dd>A small chunk of data sent across the internet. Big files are cut into many packets, and sometimes a few get lost on the way.</dd></div>
+            <div><dt>TCP</dt><dd>The old, reliable way to send data. It promises everything arrives, complete and in order, and it resends anything that goes missing.</dd></div>
+            <div><dt>Head-of-line blocking</dt><dd>When one stuck item at the front of a queue holds up everything behind it, even things that are ready to go.</dd></div>
+            <div><dt>Stream</dt><dd>One independent flow of data inside a single connection, such as one image or one script.</dd></div>
+            <div><dt>QUIC</dt><dd>A newer way to send data, built on top of UDP, that gives each stream its own lost-packet handling and has encryption built in.</dd></div>
+            <div><dt>UDP</dt><dd>A very bare-bones way to send packets with no promises. It does not resend or reorder anything, which makes it a flexible base to build on.</dd></div>
+            <div><dt>Connection ID</dt><dd>A label in each packet that says which conversation it belongs to, so the conversation can survive a change of network address.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>For decades, websites travelled over <dfn class="term" title="The classic reliable transport: delivers everything in order and resends lost data.">TCP</dfn>. TCP is careful. It numbers every byte and guarantees they arrive in order. If one <dfn class="term" title="A small chunk of data sent over the internet.">packet</dfn> is lost, TCP holds back everything after it until the missing piece is resent.</p>
+          <p>That is fine for one file. But a browser loads many files over one connection. If a packet belonging to an image is lost, the script that arrived perfectly well right after it still has to wait. That is <dfn class="term" title="One stuck item at the front of a queue blocks everything behind it.">head-of-line blocking</dfn>: the queue is shared, so one stall is everyone's stall.</p>
+          <p><dfn class="term" title="A newer transport, built on UDP, with independent streams and built-in encryption.">QUIC</dfn> fixes this by treating each file as its own <dfn class="term" title="An independent flow of data inside one connection.">stream</dfn>, with its own ordering. A lost packet only delays the stream it belonged to. The other streams keep delivering. HTTP/3 is simply the web's language (HTTP) running on top of QUIC instead of TCP.</p>
+          <p>There is a second choice worth knowing. QUIC is built on <dfn class="term" title="A bare-bones way to send packets with no delivery promises.">UDP</dfn>, not on a new kind of network packet. Every router, firewall and home gateway in the world already knows how to pass UDP along. A brand-new protocol at that level would have been blocked by old equipment for years.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: when one stream loses a packet, over TCP all three streams wait, over QUIC only that stream waits. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-23-quic-http3-d1-t 2026-10-23-quic-http3-d1-d">
+              <title id="2026-10-23-quic-http3-d1-t">What one lost packet does</title>
+              <desc id="2026-10-23-quic-http3-d1-d">Two rows of three streams: an image, a script and a style file. Over TCP, a lost packet in the image makes all three streams wait. Over QUIC, only the image stream waits and the other two keep going.</desc>
+              <text class="d-label" style="--i:0" x="10" y="30">Over TCP: one shared line</text>
+              <g class="d-node accent" style="--i:1"><rect x="10" y="45" width="220" height="60" rx="10"/><text class="d-text" x="120" y="72" text-anchor="middle">Image</text><text class="d-sub" x="120" y="92" text-anchor="middle">packet lost</text></g>
+              <g class="d-node alt" style="--i:2"><rect x="270" y="45" width="220" height="60" rx="10"/><text class="d-text" x="380" y="72" text-anchor="middle">Script</text><text class="d-sub" x="380" y="92" text-anchor="middle">arrived, but waits</text></g>
+              <g class="d-node alt" style="--i:3"><rect x="530" y="45" width="220" height="60" rx="10"/><text class="d-text" x="640" y="72" text-anchor="middle">Style file</text><text class="d-sub" x="640" y="92" text-anchor="middle">arrived, but waits</text></g>
+              <text class="d-label" style="--i:4" x="10" y="150">Over QUIC: separate lines</text>
+              <g class="d-node accent" style="--i:5"><rect x="10" y="165" width="220" height="60" rx="10"/><text class="d-text" x="120" y="192" text-anchor="middle">Image</text><text class="d-sub" x="120" y="212" text-anchor="middle">packet lost, resent</text></g>
+              <g class="d-node" style="--i:6"><rect x="270" y="165" width="220" height="60" rx="10"/><text class="d-text" x="380" y="192" text-anchor="middle">Script</text><text class="d-sub" x="380" y="212" text-anchor="middle">keeps going</text></g>
+              <g class="d-node" style="--i:7"><rect x="530" y="165" width="220" height="60" rx="10"/><text class="d-text" x="640" y="192" text-anchor="middle">Style file</text><text class="d-sub" x="640" y="212" text-anchor="middle">keeps going</text></g>
+            </svg>
+          </div>
+          <figcaption>Same lost packet, different blast radius.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>QUIC also bundles encryption into the connection setup. With TCP, a browser first sets up the connection, then separately sets up encryption on top, which costs extra round trips. QUIC does both together, so a first visit needs fewer back-and-forths, and a return visit to a server you have talked to before can often start sending data right away.</p>
+          <p>Finally, a QUIC packet carries a <dfn class="term" title="A label saying which conversation a packet belongs to.">connection ID</dfn>. A TCP connection is identified by your address and the server's, so changing network breaks it. A QUIC connection is identified by the ID, so when your phone moves from Wi-Fi to mobile data, the same conversation can carry on.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>TCP lives inside the operating system's kernel, on billions of phones, servers and routers. Changing how it handles streams would mean waiting for almost every device to update. QUIC instead lives in the application (the browser and the server software), so it can be fixed and improved at the speed of an app update.</p>
+          <p>Because it sits on UDP, QUIC has to rebuild the reliability that TCP gave for free: resending lost data and slowing down when the network is congested. The trade-off is real. It is more work for the software, and since encryption covers nearly everything, networks in the middle can see far less of what is going on, which makes them harder to debug and manage.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">TCP treats your whole page as one line. QUIC gives every file its own line.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the core ideas: QUIC runs over UDP, has independent streams, integrates TLS 1.3, and uses connection IDs; it was standardized in 2021 and HTTP/3 builds on it. I did not re-check how much of the web uses it today or exact handshake timings, so I left numbers out. Whether a return visit can send data immediately also depends on the server allowing it.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Pages feel better on bad mobile networks than on a perfect wired one.</strong> The gain is mostly in how losses are handled, so it shows up when the network is messy.</li>
+            <li><strong>A video call or download can survive switching from Wi-Fi to mobile data.</strong> The conversation is tied to an ID, not to your current address.</li>
+            <li><strong>Some office or school networks quietly fall back to the older protocol.</strong> Some firewalls block or distrust UDP traffic, so browsers keep TCP as a backup.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: RFC 9000 (QUIC) and RFC 9114 (HTTP/3), from background knowledge; not re-fetched this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-22-netflix-open-connect" data-topic="Netflix Open Connect" data-domain="Consumer apps" data-date="2026-10-22">
       <header class="entry-head">
         <div class="entry-meta">
