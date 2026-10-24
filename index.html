@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-24-amazon-s3"><time datetime="2026-10-24">2026-10-24</time><span>Amazon S3: a hard drive in the cloud that never loses your file</span></a></li>
         <li><a href="#2026-10-23-quic-http3"><time datetime="2026-10-23">2026-10-23</time><span>QUIC: one lost packet should not freeze the whole page</span></a></li>
         <li><a href="#2026-10-22-netflix-open-connect"><time datetime="2026-10-22">2026-10-22</time><span>Netflix: the movie you press play on is already down the street</span></a></li>
         <li><a href="#2026-10-21-python-gil"><time datetime="2026-10-21">2026-10-21</time><span>Python: eight cores, but only one thread runs at a time</span></a></li>
@@ -264,6 +265,91 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-24-amazon-s3" data-topic="Amazon S3" data-domain="Infra" data-date="2026-10-24">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-10-24">24 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Amazon S3: a hard drive in the cloud that never loses your file</h2>
+        <p class="lede">Photos, backups, app uploads and website assets for millions of companies sit in Amazon S3. Disks die all the time, and whole buildings can lose power. The design challenge: how do you promise that a file you saved will still be there years later, when every single machine underneath is going to fail eventually?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Object storage</dt><dd>A way of storing files as whole items, each fetched by a name (a key), instead of as folders and blocks on one disk. You put and get entire objects.</dd></div>
+            <div><dt>Bucket</dt><dd>A named container that holds your objects. The "folders" you see are really just slashes inside the object names.</dd></div>
+            <div><dt>Durability</dt><dd>The chance your data is still intact later. It is different from availability, which is whether you can reach it right now.</dd></div>
+            <div><dt>Replication</dt><dd>Keeping full copies of the same data in several places, so losing one copy does not lose the data.</dd></div>
+            <div><dt>Erasure coding</dt><dd>A trick where a file is split into pieces plus a few extra repair pieces. Any large enough subset of the pieces can rebuild the whole file.</dd></div>
+            <div><dt>Availability Zone</dt><dd>One or more separate data centers in a region, with their own power and network, far enough apart that one disaster rarely hits two.</dd></div>
+            <div><dt>Strong consistency</dt><dd>After a write succeeds, every later read sees it. Nobody gets the old version.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>S3 is <dfn class="term" title="Stores whole files as named objects, fetched by name, not as blocks on a disk.">object storage</dfn>. You do not open a file and edit the middle of it. You upload a whole object into a <dfn class="term" title="A named container for your objects.">bucket</dfn> under a name, and later you download it by that name, replace it, or delete it. Giving up in-place editing is what makes it simple enough to spread across a huge number of machines.</p>
+          <p>When you upload, S3 does not put your file on one disk. It spreads it over many disks across several <dfn class="term" title="Separate data centers within a region, with independent power and network.">Availability Zones</dfn>. If a disk, a rack or even a whole building goes dark, other copies or pieces elsewhere still hold your data.</p>
+          <p>The spreading can be done two ways. Plain <dfn class="term" title="Keeping full copies of the data in several places.">replication</dfn> stores whole copies, which is easy but costs a lot of disk. <dfn class="term" title="Splitting data into pieces plus repair pieces, so a subset can rebuild the whole.">Erasure coding</dfn> cuts the object into pieces, adds a few extra repair pieces, and spreads them out. Lose a few pieces and the rest can still rebuild the object, for much less extra disk than full copies.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: an uploaded object is cut into pieces and spread over three availability zones. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-24-amazon-s3-d1-t 2026-10-24-amazon-s3-d1-d">
+              <title id="2026-10-24-amazon-s3-d1-t">One upload, spread across buildings</title>
+              <desc id="2026-10-24-amazon-s3-d1-d">An uploaded photo goes to S3, which cuts it into pieces and repair pieces and stores them across three availability zones. If one zone is lost, the object can still be rebuilt.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="100" width="150" height="60" rx="10"/><text class="d-text" x="85" y="127" text-anchor="middle">Your upload</text><text class="d-sub" x="85" y="147" text-anchor="middle">photo.jpg</text></g>
+              <path class="d-edge accent" style="--i:1" d="M160 130 L290 130"/>
+              <path class="d-arrow" style="--i:1" d="M290 130 L280 125 L280 135 Z"/>
+              <g class="d-node" style="--i:2"><rect x="290" y="100" width="150" height="60" rx="10"/><text class="d-text" x="365" y="127" text-anchor="middle">S3</text><text class="d-sub" x="365" y="147" text-anchor="middle">cuts into pieces</text></g>
+              <path class="d-edge" style="--i:3" d="M440 115 L560 50"/>
+              <path class="d-arrow" style="--i:3" d="M560 50 L550 51 L555 59 Z"/>
+              <path class="d-edge" style="--i:3" d="M440 130 L560 130"/>
+              <path class="d-arrow" style="--i:3" d="M560 130 L550 125 L550 135 Z"/>
+              <path class="d-edge" style="--i:3" d="M440 145 L560 210"/>
+              <path class="d-arrow" style="--i:3" d="M560 210 L551 201 L546 209 Z"/>
+              <g class="d-node alt" style="--i:4"><rect x="560" y="20" width="190" height="60" rx="10"/><text class="d-text" x="655" y="47" text-anchor="middle">Zone A</text><text class="d-sub" x="655" y="67" text-anchor="middle">some pieces</text></g>
+              <g class="d-node alt" style="--i:5"><rect x="560" y="100" width="190" height="60" rx="10"/><text class="d-text" x="655" y="127" text-anchor="middle">Zone B</text><text class="d-sub" x="655" y="147" text-anchor="middle">some pieces</text></g>
+              <g class="d-node alt" style="--i:6"><rect x="560" y="180" width="190" height="60" rx="10"/><text class="d-text" x="655" y="207" text-anchor="middle">Zone C</text><text class="d-sub" x="655" y="227" text-anchor="middle">some pieces</text></g>
+            </svg>
+          </div>
+          <figcaption>No single building holds the only way back to your file.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>Spreading data is half of it. Disks fail quietly, so S3 also keeps checking stored data against checksums and, when a piece goes missing or is corrupted, rebuilds it onto a healthy disk. Durability comes from that constant repair, not just from the first copy. AWS advertises "eleven nines" of durability, meaning you should expect to lose almost nothing, but that figure is a design target, not a guarantee you could verify.</p>
+          <p>There is one more piece: finding the object. Every object has a name, and S3 keeps a huge index mapping names to where the pieces live. For years, that index was <em>eventually</em> consistent: you could upload a file and, for a moment, a listing or a read might not show it. Since December 2020, S3 is <dfn class="term" title="After a successful write, every later read sees the new data.">strongly consistent</dfn> for reads, writes and listings, at no extra cost, so a successful upload is immediately visible to everyone.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>At this scale, "a disk failed" is a daily routine, not an emergency. So the system is built to assume failure: nothing important lives in only one place, and repair runs all the time. Erasure coding is a cost trade-off: it saves disk compared with full copies, but rebuilding a lost piece needs reading several others, which is more work than just copying a replica.</p>
+          <p>Strong consistency was the harder promise. Many copies of an index must agree on the latest version of every name, and that costs coordination. For a long time the cheaper "eventually" was accepted and applications had to work around it. Offering the strong version without slowing things down was a notable engineering feat.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Durability is not one safe place. It is many unsafe places plus constant repair.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I checked AWS's December 2020 announcement of strong read-after-write consistency. The details of how S3 stores data (spreading across zones, checksums, repair) come from public descriptions and general knowledge, and I did not re-verify them this run. I deliberately left out the exact piece counts and S3's internal mechanisms, since AWS has not published them in a way I could confirm. Some storage classes keep data in only one zone.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>You cannot edit the middle of a file in S3.</strong> Objects are written whole; to change one you upload a new version.</li>
+            <li><strong>Folders in S3 are not really folders.</strong> The name is one long key, and the console just draws slashes as folders.</li>
+            <li><strong>Cheaper S3 storage classes exist.</strong> Keeping data in one zone, or on slower storage, trades protection or speed for price.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: <a href="https://aws.amazon.com/about-aws/whats-new/2020/12/amazon-s3-now-delivers-strong-read-after-write-consistency-automatically-for-all-applications">AWS announcement, Dec 2020</a>; remaining details from background knowledge.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-23-quic-http3" data-topic="QUIC and HTTP/3" data-domain="Protocols" data-date="2026-10-23">
       <header class="entry-head">
         <div class="entry-meta">
