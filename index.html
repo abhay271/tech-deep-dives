@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-25-elasticsearch-lucene"><time datetime="2026-10-25">2026-10-25</time><span>Elasticsearch: finding one word among a billion documents instantly</span></a></li>
         <li><a href="#2026-10-24-amazon-s3"><time datetime="2026-10-24">2026-10-24</time><span>Amazon S3: a hard drive in the cloud that never loses your file</span></a></li>
         <li><a href="#2026-10-23-quic-http3"><time datetime="2026-10-23">2026-10-23</time><span>QUIC: one lost packet should not freeze the whole page</span></a></li>
         <li><a href="#2026-10-22-netflix-open-connect"><time datetime="2026-10-22">2026-10-22</time><span>Netflix: the movie you press play on is already down the street</span></a></li>
@@ -265,6 +266,88 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-25-elasticsearch-lucene" data-topic="Elasticsearch and Lucene" data-domain="Databases" data-date="2026-10-25">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-10-25">25 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Elasticsearch: finding one word among a billion documents instantly</h2>
+        <p class="lede">The search box on a shop, a docs site or a log viewer has to find every page containing your words, from millions of pages, before you finish blinking. Reading every document for each search would take forever. The design challenge: how do you answer "which documents contain this word?" without looking at the documents?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Inverted index</dt><dd>A lookup table that goes from each word to the list of documents containing it. It is the reverse of a normal document, which goes from a document to its words.</dd></div>
+            <div><dt>Lucene</dt><dd>An open-source search library that does the actual indexing and searching. Elasticsearch is a server built around it that adds clustering and a web API.</dd></div>
+            <div><dt>Segment</dt><dd>A small, finished chunk of the index that is written once and never changed afterwards.</dd></div>
+            <div><dt>Merge</dt><dd>A background job that combines several small segments into one bigger segment and drops deleted documents along the way.</dd></div>
+            <div><dt>Shard</dt><dd>One slice of a big index. Each shard is a complete mini search engine, and the slices live on different machines.</dd></div>
+            <div><dt>Near real-time</dt><dd>New data becomes searchable after a short delay, usually about a second, rather than instantly.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say you store a million product descriptions and someone searches for "waterproof". The slow way is to open every description and look for the word. The fast way is to do that work once, ahead of time, and keep a table: for each word, the list of documents that contain it. That table is an <dfn class="term" title="A table from each word to the documents containing it.">inverted index</dfn>, and it is the heart of <dfn class="term" title="The open-source search library inside Elasticsearch.">Lucene</dfn>, the library inside Elasticsearch.</p>
+          <p>Now a search is a lookup. "waterproof" gives you one list. "waterproof jacket" gives you two lists, and you combine them. Nobody opens a single document until the matches are already known. The table is also kept sorted, which makes combining lists quick.</p>
+          <p>Data is not stored in one giant table, though. New documents go into a small, finished chunk called a <dfn class="term" title="A small piece of the index that is written once and never modified.">segment</dfn>. Segments are never edited after they are written. A search simply looks through all current segments and merges the answers.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: new documents become small segments, which a background merge combines into a bigger one, while searches read all segments. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-25-elasticsearch-lucene-d1-t 2026-10-25-elasticsearch-lucene-d1-d">
+              <title id="2026-10-25-elasticsearch-lucene-d1-t">Segments are written once, then merged</title>
+              <desc id="2026-10-25-elasticsearch-lucene-d1-d">New documents are written into small segments. A background merge combines small segments into one larger segment. A search reads every segment and combines the results.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="100" width="140" height="60" rx="10"/><text class="d-text" x="80" y="127" text-anchor="middle">New documents</text><text class="d-sub" x="80" y="147" text-anchor="middle">arrive</text></g>
+              <path class="d-edge accent" style="--i:1" d="M150 130 L240 130"/>
+              <path class="d-arrow" style="--i:1" d="M240 130 L230 125 L230 135 Z"/>
+              <g class="d-node" style="--i:2"><rect x="240" y="30" width="150" height="50" rx="10"/><text class="d-text" x="315" y="60" text-anchor="middle">Small segment</text></g>
+              <g class="d-node" style="--i:2"><rect x="240" y="105" width="150" height="50" rx="10"/><text class="d-text" x="315" y="135" text-anchor="middle">Small segment</text></g>
+              <g class="d-node" style="--i:2"><rect x="240" y="180" width="150" height="50" rx="10"/><text class="d-text" x="315" y="210" text-anchor="middle">Small segment</text></g>
+              <path class="d-edge" style="--i:3" d="M390 130 L500 130"/>
+              <path class="d-arrow" style="--i:3" d="M500 130 L490 125 L490 135 Z"/>
+              <text class="d-label" style="--i:3" x="445" y="120" text-anchor="middle">merge</text>
+              <g class="d-node alt" style="--i:4"><rect x="500" y="100" width="160" height="60" rx="10"/><text class="d-text" x="580" y="127" text-anchor="middle">Big segment</text><text class="d-sub" x="580" y="147" text-anchor="middle">deleted docs gone</text></g>
+              <text class="d-label" style="--i:5" x="10" y="250">A search reads every segment and combines the answers.</text>
+            </svg>
+          </div>
+          <figcaption>Write small, never edit, tidy up later.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>What about updates and deletes, if segments never change? A delete just marks the document as deleted, and searches skip it. An update is a delete plus a brand-new document. The old data is physically removed later, when a background <dfn class="term" title="Combining small segments into a bigger one and dropping deleted documents.">merge</dfn> rewrites segments into a bigger one.</p>
+          <p>To scale past one machine, Elasticsearch cuts an index into <dfn class="term" title="One slice of an index; each slice is a complete mini search engine.">shards</dfn> spread over many machines. A search goes to every shard at once, each shard answers from its own segments, and one machine collects the best results. Copies of each shard on other machines keep search working if a machine dies.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Updating one big sorted index in place would be painful: adding a document touches the lists of every word in it, scattered across the whole structure. Writing a fresh small segment is one cheap, sequential write, and a segment that never changes is easy to cache and safe to read while other work goes on, with no locks.</p>
+          <p>The price is that merging costs real disk and CPU in the background, and deleted data lingers until a merge removes it. Search is also slightly behind writes: a new document only becomes visible once a new segment is opened for searching, so Elasticsearch is <dfn class="term" title="New data becomes searchable after a short delay, not instantly.">near real-time</dfn>, not instant.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Search is fast because the reading was done before you asked.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the inverted index, immutable segments, delete-markers and background merging, which are core Lucene ideas. Elasticsearch's default is to make new data searchable roughly once per second, but that is a setting and it has changed over versions, so treat "about a second" as typical, not guaranteed. I left out relevance scoring and how documents are routed to shards.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A new post takes a moment to show up in search.</strong> It is not searchable until the next segment is opened for reading.</li>
+            <li><strong>Deleting lots of data does not free disk right away.</strong> Documents are only marked as deleted until a merge rewrites the segments.</li>
+            <li><strong>Search stays quick as data grows.</strong> More data means more shards on more machines, all searching in parallel.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Apache Lucene and Elasticsearch documentation (background knowledge, not re-verified this run).</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-24-amazon-s3" data-topic="Amazon S3" data-domain="Infra" data-date="2026-10-24">
       <header class="entry-head">
         <div class="entry-meta">
