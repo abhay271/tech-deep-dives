@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-26-vite-dev-server"><time datetime="2026-10-26">2026-10-26</time><span>Vite: why your edit shows up in the browser before you lift your finger</span></a></li>
         <li><a href="#2026-10-25-elasticsearch-lucene"><time datetime="2026-10-25">2026-10-25</time><span>Elasticsearch: finding one word among a billion documents instantly</span></a></li>
         <li><a href="#2026-10-24-amazon-s3"><time datetime="2026-10-24">2026-10-24</time><span>Amazon S3: a hard drive in the cloud that never loses your file</span></a></li>
         <li><a href="#2026-10-23-quic-http3"><time datetime="2026-10-23">2026-10-23</time><span>QUIC: one lost packet should not freeze the whole page</span></a></li>
@@ -266,6 +267,86 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-26-vite-dev-server" data-topic="Vite dev server" data-domain="Dev tools" data-date="2026-10-26">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Dev tools</span>
+          <time datetime="2026-10-26">26 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Vite: why your edit shows up in the browser before you lift your finger</h2>
+        <p class="lede">You change one line of a web app, hit save, and the page updates almost instantly. Older tools first had to glue the whole app together into one giant file, which got slower with every file you added. The design challenge: how do you keep feedback instant when the project has thousands of files?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Bundler</dt><dd>A tool that reads all your source files and combines them into a few big files for the browser to download.</dd></div>
+            <div><dt>ES modules</dt><dd>The browser's built-in way of splitting code into files. One file says "import this other file", and the browser fetches it by itself.</dd></div>
+            <div><dt>Dev server</dt><dd>A small web server on your own computer that serves your app while you work on it.</dd></div>
+            <div><dt>Dependency</dt><dd>Code written by someone else that your app uses, such as a UI library installed from npm.</dd></div>
+            <div><dt>Pre-bundling</dt><dd>Combining each dependency into one file once, up front, so the browser does not have to fetch hundreds of tiny files for it.</dd></div>
+            <div><dt>HMR (hot module replacement)</dt><dd>Swapping just the changed file into the running page, without reloading it, so you keep your place and your app state.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>The classic approach was to run a <dfn class="term" title="Combines all your source files into a few big files.">bundler</dfn> before showing you anything. It read every file, followed every import, and produced one big output. Start-up time grew with the size of the app, and a small edit often meant rebuilding a lot.</p>
+          <p>Vite flips this. Modern browsers can already load code split across files, using <dfn class="term" title="The browser's built-in import system for JavaScript files.">ES modules</dfn>. So Vite's <dfn class="term" title="A local web server used while developing.">dev server</dfn> does almost nothing at start-up. When the browser asks for a file, Vite takes your source, converts it into plain JavaScript if needed (for example from TypeScript), and sends it. Files nobody asked for are never touched.</p>
+          <p>Your own code is easy, but libraries are not. A single <dfn class="term" title="Code written by someone else that your app uses.">dependency</dfn> can be made of hundreds of small files, and many are written in an older module style that browsers cannot load. So on first start Vite does <dfn class="term" title="Turning each library into one browser-ready file, once, up front.">pre-bundling</dfn>: it uses a very fast bundler called esbuild to turn each library into a single file, then caches it. Your own files stay separate; the libraries are bundled once and rarely change.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: the browser asks the dev server for each file, the server converts it on demand, and a file watcher pushes changes to the browser. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 260" role="img" aria-labelledby="2026-10-26-vite-dev-server-d1-t 2026-10-26-vite-dev-server-d1-d">
+              <title id="2026-10-26-vite-dev-server-d1-t">Files are converted when the browser asks</title>
+              <desc id="2026-10-26-vite-dev-server-d1-d">The browser requests a file from the Vite dev server. The server reads it from your project, converts it, and returns it. When you save a file, the server sends a message to the browser naming the changed file, and the browser swaps in just that one.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="100" width="150" height="60" rx="10"/><text class="d-text" x="85" y="127" text-anchor="middle">Browser</text><text class="d-sub" x="85" y="147" text-anchor="middle">asks for a file</text></g>
+              <path class="d-edge accent" style="--i:1" d="M160 130 L290 130"/>
+              <path class="d-arrow" style="--i:1" d="M290 130 L280 125 L280 135 Z"/>
+              <g class="d-node" style="--i:2"><rect x="290" y="100" width="170" height="60" rx="10"/><text class="d-text" x="375" y="127" text-anchor="middle">Dev server</text><text class="d-sub" x="375" y="147" text-anchor="middle">converts on demand</text></g>
+              <path class="d-edge" style="--i:3" d="M460 130 L560 130"/>
+              <path class="d-arrow" style="--i:3" d="M560 130 L550 125 L550 135 Z"/>
+              <g class="d-node alt" style="--i:4"><rect x="560" y="100" width="190" height="60" rx="10"/><text class="d-text" x="655" y="127" text-anchor="middle">Your files</text><text class="d-sub" x="655" y="147" text-anchor="middle">saved on disk</text></g>
+              <path class="d-edge accent" style="--i:5" d="M375 100 L375 50 L85 50 L85 92"/>
+              <path class="d-arrow" style="--i:5" d="M85 100 L80 90 L90 90 Z"/>
+              <text class="d-label" style="--i:6" x="230" y="40" text-anchor="middle">on save: "swap in this one file"</text>
+            </svg>
+          </div>
+          <figcaption>Nothing is built ahead of time; each file is prepared when asked for.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>The second half is the instant update. The dev server watches your files. When you save one, it sends a short message over a live connection to the page: "this file changed". The browser fetches only that file and swaps it in. This is <dfn class="term" title="Replacing only the changed file in the running page, without a full reload.">HMR</dfn>. Because the page is not reloaded, things like what you typed into a form or which tab you had open usually survive the edit.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The cost of a bundler grows with the size of the whole app, but what you want to see after an edit is only about the one file you changed. By letting the browser do the importing, the work per edit stays small no matter how big the project is.</p>
+          <p>The price: a big app now makes the browser request many files, which is fine on your own machine but slow over a real network. So for the version you ship to users, Vite still bundles everything into a few optimized files. That means development and production run the code in two different ways, and very rarely a bug shows up in only one of them.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Do the work only for the file someone is actually looking at.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the on-demand serving, dependency pre-bundling and HMR design. The tools underneath have been changing: Vite has used esbuild for pre-bundling and Rollup for production builds, and the project has been moving toward a newer bundler called Rolldown. I did not check which one your version uses, so treat those names as accurate for well-known versions, not necessarily the latest.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>The dev server starts in a blink, even for a big app.</strong> It builds nothing up front except the libraries.</li>
+            <li><strong>Saving a file keeps your page state.</strong> Only that one module is swapped, not the whole page.</li>
+            <li><strong>The first start after installing a new library is slower.</strong> Vite has to pre-bundle it once before caching.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Vite documentation (background knowledge, not re-verified this run).</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-25-elasticsearch-lucene" data-topic="Elasticsearch and Lucene" data-domain="Databases" data-date="2026-10-25">
       <header class="entry-head">
         <div class="entry-meta">
