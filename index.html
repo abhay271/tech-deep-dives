@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-27-jvm-garbage-collection"><time datetime="2026-10-27">2026-10-27</time><span>The JVM: how a Java program cleans up memory without ever being told to</span></a></li>
         <li><a href="#2026-10-26-vite-dev-server"><time datetime="2026-10-26">2026-10-26</time><span>Vite: why your edit shows up in the browser before you lift your finger</span></a></li>
         <li><a href="#2026-10-25-elasticsearch-lucene"><time datetime="2026-10-25">2026-10-25</time><span>Elasticsearch: finding one word among a billion documents instantly</span></a></li>
         <li><a href="#2026-10-24-amazon-s3"><time datetime="2026-10-24">2026-10-24</time><span>Amazon S3: a hard drive in the cloud that never loses your file</span></a></li>
@@ -267,6 +268,85 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-27-jvm-garbage-collection" data-topic="JVM garbage collection" data-domain="OS/runtime internals" data-date="2026-10-27">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">OS/runtime internals</span>
+          <time datetime="2026-10-27">27 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">The JVM: how a Java program cleans up memory without ever being told to</h2>
+        <p class="lede">A big Java server, such as the ones behind banks and Android backends, creates millions of short-lived objects every second and never explicitly frees any of them. Something has to find the dead ones and reclaim the space, ideally without freezing the program while it looks. The design challenge: how do you find garbage in a huge heap without stopping everything to do it?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>JVM</dt><dd>The Java Virtual Machine, the program that runs Java (and Kotlin, Scala) code. It also manages the program's memory for you.</dd></div>
+            <div><dt>Heap</dt><dd>The big area of memory where a program's objects live.</dd></div>
+            <div><dt>Garbage collector (GC)</dt><dd>The part of the JVM that finds objects nothing can reach any more and frees their space.</dd></div>
+            <div><dt>Generation</dt><dd>A heap region grouped by object age. Young objects live in the young generation, long-lived ones get moved to the old generation.</dd></div>
+            <div><dt>Pause (stop-the-world)</dt><dd>A moment when the JVM freezes all your program's threads so the collector can work safely.</dd></div>
+            <div><dt>Concurrent</dt><dd>Running at the same time as your program instead of freezing it.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Think of a web request. It creates a few objects: a parsed request, some temporary strings, a response. A few milliseconds later, all of them are useless. Now picture the whole <dfn class="term" title="The area of memory where a program's objects live.">heap</dfn> full of these, plus a small number of objects that really do live for hours, like a cache. The <dfn class="term" title="Finds objects nothing can reach any more and frees their space.">garbage collector</dfn> has to tell them apart.</p>
+          <p>It does this by starting from things the program is clearly still using (local variables, static fields) and following references. Whatever it reaches is alive. Whatever it never reaches is garbage. Notice that it only walks the living objects, so the cost depends on how much is alive, not on how much junk there is.</p>
+          <p>The key trick is that most objects die young. So the JVM splits the heap into <dfn class="term" title="A heap region grouped by object age.">generations</dfn>. New objects go into a small young area. When it fills up, the collector copies the few survivors out to a fresh spot and wipes the rest in one go. Objects that survive several rounds are moved to the old area, which is collected much less often.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: new objects enter the young area, survivors are copied to the old area, and the old area is cleaned rarely. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-27-jvm-garbage-collection-d1-t 2026-10-27-jvm-garbage-collection-d1-d">
+              <title id="2026-10-27-jvm-garbage-collection-d1-t">Young objects die fast, survivors move to the old area</title>
+              <desc id="2026-10-27-jvm-garbage-collection-d1-d">New objects are created in the young area. When it fills, the collector copies the few live objects out and clears the rest. Objects that survive repeatedly are moved to the old area, which is collected rarely.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="90" width="150" height="60" rx="10"/><text class="d-text" x="85" y="117" text-anchor="middle">Your program</text><text class="d-sub" x="85" y="137" text-anchor="middle">creates objects</text></g>
+              <path class="d-edge accent" style="--i:1" d="M160 120 L270 120"/>
+              <path class="d-arrow" style="--i:1" d="M270 120 L260 115 L260 125 Z"/>
+              <g class="d-node" style="--i:2"><rect x="270" y="90" width="190" height="60" rx="10"/><text class="d-text" x="365" y="117" text-anchor="middle">Young area</text><text class="d-sub" x="365" y="137" text-anchor="middle">cleaned often, quick</text></g>
+              <path class="d-edge" style="--i:3" d="M460 120 L560 120"/>
+              <path class="d-arrow" style="--i:3" d="M560 120 L550 115 L550 125 Z"/>
+              <text class="d-label" style="--i:3" x="510" y="108" text-anchor="middle">survivors</text>
+              <g class="d-node alt" style="--i:4"><rect x="560" y="90" width="190" height="60" rx="10"/><text class="d-text" x="655" y="117" text-anchor="middle">Old area</text><text class="d-sub" x="655" y="137" text-anchor="middle">cleaned rarely</text></g>
+              <text class="d-label" style="--i:5" x="365" y="200" text-anchor="middle">most objects never leave the young area</text>
+            </svg>
+          </div>
+          <figcaption>Cheap, frequent cleanup where the garbage is; rare cleanup where it is not.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>Cleaning the old area is the hard part, because it is big and full of live objects. Early collectors froze the whole program for that, which could mean a visible stall. Newer ones like G1 and ZGC split the heap into pieces and do most of the walking <dfn class="term" title="Running at the same time as your program.">concurrently</dfn>, so the program keeps going. They still need tiny <dfn class="term" title="A moment when all program threads are frozen so the collector can work.">pauses</dfn>, but ZGC aims to keep these very short, regardless of heap size.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Freeing memory by hand is how C programs end up with crashes and security holes: free too early and you use dead memory, free too late and you leak. Automatic collection removes that whole class of bugs.</p>
+          <p>The price is that the collector competes with your program for CPU and sometimes for time. Every collector is a trade between three things: how much work it steals (throughput), how long it freezes you (pause), and how much extra memory it needs. You cannot have all three, so the JVM ships several collectors and you pick the compromise that fits.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Most objects die young, so spend your effort where the garbage is.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the generational idea and the throughput/pause/memory trade-off. Which collector is the default and whether ZGC is generational by default have changed across recent Java versions (G1 has been the default for years, ZGC added a generational mode in newer releases). I did not re-check the exact version details this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Java servers seem to use far more memory than they need.</strong> The collector is faster when it has spare room, so the JVM happily grows the heap.</li>
+            <li><strong>Apps sometimes freeze for a moment, then carry on.</strong> That is a pause while the collector works.</li>
+            <li><strong>Creating many tiny temporary objects is usually fine in Java.</strong> Dead young objects cost almost nothing to clean up.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: OpenJDK GC documentation and JEPs (background knowledge, not re-verified this run).</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-26-vite-dev-server" data-topic="Vite dev server" data-domain="Dev tools" data-date="2026-10-26">
       <header class="entry-head">
         <div class="entry-meta">
