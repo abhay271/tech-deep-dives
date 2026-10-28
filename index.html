@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-28-spotify-discover-weekly"><time datetime="2026-10-28">2026-10-28</time><span>Spotify Discover Weekly: songs you have never heard but somehow love</span></a></li>
         <li><a href="#2026-10-27-jvm-garbage-collection"><time datetime="2026-10-27">2026-10-27</time><span>The JVM: how a Java program cleans up memory without ever being told to</span></a></li>
         <li><a href="#2026-10-26-vite-dev-server"><time datetime="2026-10-26">2026-10-26</time><span>Vite: why your edit shows up in the browser before you lift your finger</span></a></li>
         <li><a href="#2026-10-25-elasticsearch-lucene"><time datetime="2026-10-25">2026-10-25</time><span>Elasticsearch: finding one word among a billion documents instantly</span></a></li>
@@ -268,6 +269,83 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-28-spotify-discover-weekly" data-topic="Spotify Discover Weekly" data-domain="Consumer apps" data-date="2026-10-28">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-10-28">28 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Spotify Discover Weekly: how it picks songs you have never heard but somehow love</h2>
+        <p class="lede">Every Monday, Spotify hands each of its hundreds of millions of users a fresh playlist of songs they have never played. Nobody sat down and chose them. The design challenge: how do you recommend a song to someone when you cannot "understand" music, and the song may be brand new?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Recommendation system</dt><dd>Software that guesses what you will like next, based on data about you and about everyone else.</dd></div>
+            <div><dt>Collaborative filtering</dt><dd>Recommending by comparing people: if you and another listener enjoy many of the same songs, you probably also like what they like that you have not heard yet.</dd></div>
+            <div><dt>Taste profile</dt><dd>A summary of what a listener likes, built from what they play, skip and save.</dd></div>
+            <div><dt>Vector</dt><dd>A list of numbers that describes something. Two items with similar lists are treated as similar.</dd></div>
+            <div><dt>Cold start</dt><dd>The problem of having no listening data yet for a new song or a new user, so there is nothing to compare.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say you and a stranger both love the same twenty indie songs. The stranger also plays a track you have never heard. It is a decent bet you will like it too. That is <dfn class="term" title="Recommending by comparing listeners with similar habits.">collaborative filtering</dfn>, and it is the main idea behind Discover Weekly. Nothing in it needs to know what the music sounds like.</p>
+          <p>At Spotify's size, nobody compares every pair of people directly. Instead the system builds a huge table of who played what, and boils it down so that every listener and every song becomes a <dfn class="term" title="A list of numbers describing something; similar lists mean similar things.">vector</dfn>. Songs whose vectors sit close to your <dfn class="term" title="A summary of what you like, built from what you play, skip and save.">taste profile</dfn> are candidates. Spotify has described this approach publicly, in talks and posts.</p>
+          <p>Then the candidates are filtered: remove songs you have already played, and keep a mix that suits your usual taste without being a copy of it.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: listening history is turned into a taste profile, matched against songs, then filtered into a playlist. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 240" role="img" aria-labelledby="2026-10-28-spotify-discover-weekly-d1-t 2026-10-28-spotify-discover-weekly-d1-d">
+              <title id="2026-10-28-spotify-discover-weekly-d1-t">From listening history to a weekly playlist</title>
+              <desc id="2026-10-28-spotify-discover-weekly-d1-d">Everyone's listening history is boiled down into a taste profile for each listener and a vector for each song. Songs close to your profile become candidates. Songs you have already heard are removed, leaving the weekly playlist.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="90" width="150" height="60" rx="10"/><text class="d-text" x="85" y="117" text-anchor="middle">Everyone's plays</text><text class="d-sub" x="85" y="137" text-anchor="middle">saves, skips</text></g>
+              <path class="d-edge accent" style="--i:1" d="M160 120 L270 120"/>
+              <path class="d-arrow" style="--i:1" d="M270 120 L260 115 L260 125 Z"/>
+              <g class="d-node" style="--i:2"><rect x="270" y="90" width="210" height="60" rx="10"/><text class="d-text" x="375" y="117" text-anchor="middle">Taste + song vectors</text><text class="d-sub" x="375" y="137" text-anchor="middle">find songs near you</text></g>
+              <path class="d-edge" style="--i:3" d="M480 120 L570 120"/>
+              <path class="d-arrow" style="--i:3" d="M570 120 L560 115 L560 125 Z"/>
+              <g class="d-node alt" style="--i:4"><rect x="570" y="90" width="180" height="60" rx="10"/><text class="d-text" x="660" y="117" text-anchor="middle">Your playlist</text><text class="d-sub" x="660" y="137" text-anchor="middle">only new songs</text></g>
+              <text class="d-label" style="--i:5" x="375" y="200" text-anchor="middle">similar listeners point to songs you have not met</text>
+            </svg>
+          </div>
+          <figcaption>People who listen alike share songs, even when they have never met.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>There is a catch. A brand-new song has no plays, so nobody's habits point to it. That is the <dfn class="term" title="No listening data yet for a new song or user.">cold start</dfn> problem. Spotify has said it also uses other signals: what blogs and articles say about a song, and what the audio itself is like. These let a new song be placed near similar ones before anyone has played it much.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Understanding music directly is very hard. Why does a sad song feel sad? Nobody can write that down as rules. But people already reveal their taste every time they press play, skip or save, so it is far easier to learn from behavior than from the sound.</p>
+          <p>The trade-off is that behavior only works where there is data. Popular songs have plenty; new or obscure ones do not. That is why the audio and text signals exist, as a backup for the places where listening data is thin.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Don't figure out what the music is. Figure out who else listens like you.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the collaborative-filtering core and the cold-start problem. Spotify's exact models have changed over the years and are not fully public, so treat the details of the current system, and the exact mix of signals, as unknown to me. I did not re-check sources this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Your playlist changes if you binge something odd.</strong> Your taste profile moves with what you play, so a week of kids' songs shifts who your "neighbors" are.</li>
+            <li><strong>Skips matter.</strong> A skip is a quiet vote against a song, so it is data too.</li>
+            <li><strong>It feels uncannily good and sometimes weirdly off.</strong> It is matching you to crowds, not to your mood, so a shared account or a party night muddies the profile.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Spotify's public talks and engineering posts on recommendations (background knowledge, not re-verified this run).</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-27-jvm-garbage-collection" data-topic="JVM garbage collection" data-domain="OS/runtime internals" data-date="2026-10-27">
       <header class="entry-head">
         <div class="entry-meta">
