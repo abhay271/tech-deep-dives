@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-29-ssh"><time datetime="2026-10-29">2026-10-29</time><span>SSH: logging in across the world without sending your password</span></a></li>
         <li><a href="#2026-10-28-spotify-discover-weekly"><time datetime="2026-10-28">2026-10-28</time><span>Spotify Discover Weekly: songs you have never heard but somehow love</span></a></li>
         <li><a href="#2026-10-27-jvm-garbage-collection"><time datetime="2026-10-27">2026-10-27</time><span>The JVM: how a Java program cleans up memory without ever being told to</span></a></li>
         <li><a href="#2026-10-26-vite-dev-server"><time datetime="2026-10-26">2026-10-26</time><span>Vite: why your edit shows up in the browser before you lift your finger</span></a></li>
@@ -269,6 +270,89 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-29-ssh" data-topic="SSH" data-domain="Protocols" data-date="2026-10-29">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-10-29">29 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">SSH: how you log in to a computer across the world without sending your password</h2>
+        <p class="lede">Every developer eventually types <code>ssh</code> to control a server they have never touched, over a network that strangers can watch. The design challenge: how do two machines that have never met agree on a secret, and prove who they are, while everyone listens in?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>SSH (Secure Shell)</dt><dd>A protocol for safely controlling a remote computer by typing commands, and for moving files to and from it.</dd></div>
+            <div><dt>Encryption</dt><dd>Scrambling data so that only someone with the right secret key can read it.</dd></div>
+            <div><dt>Key exchange</dt><dd>A short conversation in which two computers agree on a shared secret, even though everything they say can be overheard.</dd></div>
+            <div><dt>Public/private key pair</dt><dd>Two linked numbers. The public one can be shared with anyone; the private one stays secret. Something signed with the private key can be checked with the public one, but not forged.</dd></div>
+            <div><dt>Host key</dt><dd>The public/private key pair that identifies a server, so you know you reached the real one.</dd></div>
+            <div><dt>Port forwarding (tunnel)</dt><dd>Sending some other network traffic through an existing SSH connection, so it gets the same protection.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Before SSH, people logged in to remote machines with tools like Telnet, which sent everything, passwords included, as plain text. Anyone on the path could read it. SSH was written in 1995 by Tatu Ylönen after a password-sniffing attack on his university network, and it fixes this in three steps.</p>
+          <p>First, the two computers do a <dfn class="term" title="A short conversation where two computers agree on a shared secret while others listen.">key exchange</dfn>. Using some clever maths, they each end up with the same secret number, though an eavesdropper who saw every message cannot work it out. That secret becomes the key for <dfn class="term" title="Scrambling data so only holders of the key can read it.">encryption</dfn>, and from now on everything is scrambled.</p>
+          <p>Second, the server proves who it is. It signs part of the key exchange with its <dfn class="term" title="The key pair that identifies a server.">host key</dfn>. The first time you connect, SSH shows you a fingerprint and asks if you trust it, then remembers it in a file called <code>known_hosts</code>. If it ever changes, you get a loud warning, because someone may be impersonating the server.</p>
+          <p>Third, you prove who you are. You can type a password, but the better way is a <dfn class="term" title="Two linked keys: one shareable, one secret. Signatures from the secret one can be checked with the shareable one.">key pair</dfn>. You put your public key on the server once. Later the server sends a challenge, your computer signs it with the private key, and the server checks the signature. Your private key never leaves your machine, so there is nothing to steal from the wire.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: client and server agree on a secret, the server proves its identity, then the client proves its identity. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-10-29-ssh-d1-t 2026-10-29-ssh-d1-d">
+              <title id="2026-10-29-ssh-d1-t">The three steps of an SSH connection</title>
+              <desc id="2026-10-29-ssh-d1-d">A client and a server first agree on a shared secret. The server then proves its identity with its host key. Finally the client proves its identity by signing a challenge with its private key.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="20" y="30" width="150" height="60" rx="10"/><text class="d-text" x="95" y="57" text-anchor="middle">Your laptop</text><text class="d-sub" x="95" y="77" text-anchor="middle">client</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="590" y="30" width="150" height="60" rx="10"/><text class="d-text" x="665" y="57" text-anchor="middle">Server</text><text class="d-sub" x="665" y="77" text-anchor="middle">remote machine</text></g>
+              <path class="d-edge accent" style="--i:1" d="M170 120 L580 120"/>
+              <path class="d-arrow" style="--i:1" d="M580 120 L570 115 L570 125 Z"/>
+              <text class="d-label" style="--i:1" x="375" y="110" text-anchor="middle">1. agree on a secret key</text>
+              <path class="d-edge" style="--i:2" d="M580 180 L180 180"/>
+              <path class="d-arrow" style="--i:2" d="M180 180 L190 175 L190 185 Z"/>
+              <text class="d-label" style="--i:2" x="375" y="170" text-anchor="middle">2. server proves it is the real one</text>
+              <path class="d-edge accent" style="--i:3" d="M170 240 L580 240"/>
+              <path class="d-arrow" style="--i:3" d="M580 240 L570 235 L570 245 Z"/>
+              <text class="d-label" style="--i:3" x="375" y="230" text-anchor="middle">3. you prove who you are</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 120 L580 120"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Secrecy first, then each side checks the other, all before any command is typed.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>Once that is done, SSH carries several independent streams inside the one encrypted connection: your terminal, a file copy, or a <dfn class="term" title="Sending other network traffic through an existing SSH connection.">tunnel</dfn> to another service. That is why a single login can also reach a database that is hidden from the internet.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The network between you and the server is untrusted, and you cannot meet the server in person to swap secrets first. So the protocol has to build trust from nothing, using only messages anyone can read.</p>
+          <p>The trade-off is that the very first connection is a leap of faith. SSH cannot know the fingerprint is genuine unless you check it some other way. That "trust on first use" is simple and good enough in practice, but it is the weak spot.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Agree on a secret in public, then use it to check everyone's identity.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the overall flow (key exchange, host check, user authentication, multiple channels) as defined in the SSH-2 standards. I simplified the order and omitted details, and the 1995 origin story is from memory. Which algorithms are used depends on the software version and settings. I did not re-check sources this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>The "authenticity of host can't be established" prompt.</strong> That is the first-use leap of faith, with your computer asking you to vouch for the server.</li>
+            <li><strong>The scary "host identification has changed" warning.</strong> The server's key no longer matches what you saved, which is either a reinstall or an impostor.</li>
+            <li><strong>Pushing code to GitHub without a password.</strong> You uploaded a public key once; every push is just a signed challenge.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: SSH-2 standards (RFC 4251 to 4254) and general background knowledge, not re-verified this run.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-28-spotify-discover-weekly" data-topic="Spotify Discover Weekly" data-domain="Consumer apps" data-date="2026-10-28">
       <header class="entry-head">
         <div class="entry-meta">
