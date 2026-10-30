@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-30-aws-lambda-firecracker"><time datetime="2026-10-30">2026-10-30</time><span>AWS Lambda: running strangers' code side by side, safely, in a blink</span></a></li>
         <li><a href="#2026-10-29-ssh"><time datetime="2026-10-29">2026-10-29</time><span>SSH: logging in across the world without sending your password</span></a></li>
         <li><a href="#2026-10-28-spotify-discover-weekly"><time datetime="2026-10-28">2026-10-28</time><span>Spotify Discover Weekly: songs you have never heard but somehow love</span></a></li>
         <li><a href="#2026-10-27-jvm-garbage-collection"><time datetime="2026-10-27">2026-10-27</time><span>The JVM: how a Java program cleans up memory without ever being told to</span></a></li>
@@ -270,6 +271,92 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-30-aws-lambda-firecracker" data-topic="AWS Lambda and Firecracker" data-domain="Infra" data-date="2026-10-30">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-10-30">30 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">AWS Lambda: how your code runs on a computer shared with strangers, safely, in a blink</h2>
+        <p class="lede">With AWS Lambda you upload a small function and it runs only when something calls it, possibly for a few milliseconds, on a machine that also runs other customers' code. The design challenge: keep strangers' code completely apart, yet start a new copy fast enough that nobody waits.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Serverless</dt><dd>A way of running code where you hand over a function and the provider decides where and when it runs. You never set up or look after a server yourself.</dd></div>
+            <div><dt>Virtual machine (VM)</dt><dd>A pretend computer running inside a real one. It has its own operating system, so what happens inside it is walled off from everything else.</dd></div>
+            <div><dt>Container</dt><dd>A lighter way to separate programs. Containers on one machine all share the same operating system core, so the wall between them is thinner than a VM's.</dd></div>
+            <div><dt>Hypervisor</dt><dd>The software that creates and manages virtual machines. On Linux, a built-in feature called KVM lets the processor do much of this work.</dd></div>
+            <div><dt>MicroVM</dt><dd>A virtual machine stripped down to the bare minimum, so it starts quickly and uses little memory.</dd></div>
+            <div><dt>Cold start</dt><dd>The delay when a function has to run in a brand-new environment because no ready one exists yet.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine a function that resizes a photo whenever someone uploads one. Most of the day nobody uploads anything. Renting a whole server for that would be wasteful, so with <dfn class="term" title="Running code without managing servers; the provider handles where and when.">serverless</dfn> you hand the function to AWS and it runs only when needed.</p>
+          <p>Behind the scenes, AWS keeps a fleet of ordinary servers. When a request arrives for your function, Lambda looks for a ready, idle copy of your function. If there is one, it reuses it. If not, it makes a new one on some server that has room. Many customers' functions end up on the same physical machine.</p>
+          <p>That is dangerous if the wall between them is weak. So each copy runs inside its own <dfn class="term" title="A very small virtual machine that starts fast and uses little memory.">microVM</dfn>. AWS built a tool for this called Firecracker, released as open source in 2018. It uses the Linux <dfn class="term" title="Software that creates virtual machines; on Linux it works with the KVM feature in the processor.">hypervisor</dfn> support already in the kernel, and offers each microVM only a tiny set of pretend devices, such as a network card and a disk. Fewer devices means less code an attacker could try to exploit.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a request reaches Lambda, which reuses an idle microVM or starts a new one on a shared server. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-10-30-aws-lambda-firecracker-d1-t 2026-10-30-aws-lambda-firecracker-d1-d">
+              <title id="2026-10-30-aws-lambda-firecracker-d1-t">A request meets a microVM</title>
+              <desc id="2026-10-30-aws-lambda-firecracker-d1-d">A request arrives at Lambda. If an idle microVM for that function exists, the request goes there. Otherwise a new microVM is started on a shared server. Each customer's function sits in its own microVM on the same physical machine.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="120" width="130" height="60" rx="10"/><text class="d-text" x="75" y="147" text-anchor="middle">Request</text><text class="d-sub" x="75" y="167" text-anchor="middle">photo uploaded</text></g>
+              <path class="d-edge accent" style="--i:1" d="M140 150 L230 150"/>
+              <path class="d-arrow" style="--i:1" d="M230 150 L220 145 L220 155 Z"/>
+              <g class="d-node" style="--i:2"><rect x="230" y="120" width="130" height="60" rx="10"/><text class="d-text" x="295" y="147" text-anchor="middle">Lambda</text><text class="d-sub" x="295" y="167" text-anchor="middle">finds a home</text></g>
+              <path class="d-edge" style="--i:3" d="M360 135 L450 80"/>
+              <path class="d-arrow" style="--i:3" d="M450 80 L440 80 L444 89 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M360 165 L450 220"/>
+              <path class="d-arrow" style="--i:3" d="M450 220 L440 220 L444 211 Z"/>
+              <text class="d-label" style="--i:4" x="400" y="105" text-anchor="middle">idle one</text>
+              <text class="d-label" style="--i:4" x="400" y="255" text-anchor="middle">none: start new</text>
+              <rect x="450" y="30" width="300" height="240" rx="12" fill="none" stroke="currentColor" opacity="0.35"/>
+              <text class="d-label" style="--i:4" x="600" y="52" text-anchor="middle">one shared server</text>
+              <g class="d-node alt" style="--i:5"><rect x="465" y="65" width="130" height="60" rx="10"/><text class="d-text" x="530" y="92" text-anchor="middle">MicroVM</text><text class="d-sub" x="530" y="112" text-anchor="middle">your function</text></g>
+              <g class="d-node" style="--i:5"><rect x="610" y="65" width="130" height="60" rx="10"/><text class="d-text" x="675" y="92" text-anchor="middle">MicroVM</text><text class="d-sub" x="675" y="112" text-anchor="middle">someone else's</text></g>
+              <g class="d-node accent" style="--i:6"><rect x="465" y="190" width="130" height="60" rx="10"/><text class="d-text" x="530" y="217" text-anchor="middle">New microVM</text><text class="d-sub" x="530" y="237" text-anchor="middle">cold start</text></g>
+              <g class="d-node" style="--i:6"><rect x="610" y="190" width="130" height="60" rx="10"/><text class="d-text" x="675" y="217" text-anchor="middle">MicroVM</text><text class="d-sub" x="675" y="237" text-anchor="middle">another customer</text></g>
+            </svg>
+          </div>
+          <figcaption>Reuse a warm microVM if one is free, otherwise start a new one. Neighbours never share one.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>The wait for that new microVM is a <dfn class="term" title="The delay when code must run in a brand-new environment.">cold start</dfn>. Firecracker was designed to keep it small: AWS's papers and announcements talk about a microVM booting in roughly a tenth of a second, with very little memory overhead beyond what the function itself uses. Lambda also keeps finished environments around for a while, so the next request often skips the cold start entirely.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The two obvious options each fail at something. A full <dfn class="term" title="A pretend computer with its own operating system, walled off from others.">virtual machine</dfn> is a strong wall but slow to start and heavy. A <dfn class="term" title="Programs separated while sharing one operating system core.">container</dfn> starts quickly, but all containers share the machine's operating system core, so one bug in that core could let a hostile customer reach their neighbours. For a service running other people's code, that risk is too high.</p>
+          <p>A microVM is the compromise: the strong wall of a virtual machine, made small enough to start quickly. The cost is that AWS had to write and maintain its own tool, and that every environment still carries some overhead that a plain container would not.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Strong walls usually mean slow and heavy. Firecracker's trick is to build the wall out of almost nothing.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident that Lambda runs functions in Firecracker microVMs, that Firecracker is open source and built on KVM, and that environments are reused between requests but not shared between customers. The boot time and memory overhead are AWS's own claims, and real cold starts also depend on your language, code size and settings, so I left out exact figures. AWS also has features that snapshot a started environment to speed up cold starts; I am not describing how those work.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>The first request after a quiet spell is slower.</strong> There was no warm environment, so a new one had to start.</li>
+            <li><strong>Variables you set outside your function sometimes survive between calls.</strong> The same environment was reused, which is a convenience, but also why you must not rely on it.</li>
+            <li><strong>You are billed for the time your code actually runs.</strong> Nothing is reserved while it is idle, because the microVM can be paused or thrown away.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: <a href="https://lwn.net/Articles/775736">LWN on Firecracker</a>, the <a href="https://www.infoq.com/news/2018/12/aws-firecracker">InfoQ report on its release</a>, and AWS's Firecracker paper as summarized by <a href="https://blog.acolyer.org/2020/03/02/firecracker/">the morning paper</a>.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-29-ssh" data-topic="SSH" data-domain="Protocols" data-date="2026-10-29">
       <header class="entry-head">
         <div class="entry-meta">
