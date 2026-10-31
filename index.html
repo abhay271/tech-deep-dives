@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-10-31-bazel"><time datetime="2026-10-31">2026-10-31</time><span>Bazel: how a huge codebase rebuilds only what you actually changed</span></a></li>
         <li><a href="#2026-10-30-aws-lambda-firecracker"><time datetime="2026-10-30">2026-10-30</time><span>AWS Lambda: running strangers' code side by side, safely, in a blink</span></a></li>
         <li><a href="#2026-10-29-ssh"><time datetime="2026-10-29">2026-10-29</time><span>SSH: logging in across the world without sending your password</span></a></li>
         <li><a href="#2026-10-28-spotify-discover-weekly"><time datetime="2026-10-28">2026-10-28</time><span>Spotify Discover Weekly: songs you have never heard but somehow love</span></a></li>
@@ -271,6 +272,88 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-10-31-bazel" data-topic="Bazel" data-domain="Dev tools" data-date="2026-10-31">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Dev tools</span>
+          <time datetime="2026-10-31">31 Oct 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Bazel: how a huge codebase rebuilds only what you actually changed</h2>
+        <p class="lede">At a company with millions of lines of code, you change one file and need a fresh build. Rebuilding everything would take hours. The design challenge: how does a build tool know, with certainty, what can safely be skipped?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Build system</dt><dd>The tool that turns source code into something runnable, by running compilers and other programs in the right order.</dd></div>
+            <div><dt>Monorepo</dt><dd>One big repository holding the code of many projects, instead of one repository per project.</dd></div>
+            <div><dt>Hash</dt><dd>A short fingerprint computed from some data. If the data changes even slightly, the fingerprint changes completely.</dd></div>
+            <div><dt>Cache</dt><dd>A saved result you can reuse instead of computing it again.</dd></div>
+            <div><dt>Hermetic build</dt><dd>A build that depends only on the inputs you declared, not on anything hidden on the machine, such as a tool someone installed by hand.</dd></div>
+            <div><dt>Sandbox</dt><dd>A restricted space where a program can see only the files it was given.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say you work at a company where thousands of engineers share one <dfn class="term" title="One big repository holding the code of many projects.">monorepo</dfn>. You fix a typo in a small library. Only the programs that use that library need rebuilding, and most of the company's code does not. The question is how a <dfn class="term" title="The tool that turns source code into runnable programs.">build system</dfn> proves that.</p>
+          <p>Bazel, which Google open-sourced in 2015 and which grew out of Google's internal tool, answers by making every build step spell out its inputs and outputs. In its build files, each target says: these are my source files, these are the other targets I depend on, this is what I produce. Bazel reads all of this and builds a graph of the whole codebase, a map of what depends on what.</p>
+          <p>Then it treats each step as a pure function: same inputs in, same output out. For every step it computes a <dfn class="term" title="A fingerprint of some data that changes completely if the data changes.">hash</dfn> of the inputs, the command and the tools. If it has seen that exact hash before, it reuses the saved result from a <dfn class="term" title="A saved result reused instead of recomputed.">cache</dfn> instead of running the step again.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a dependency graph where one changed file forces rebuilding only the steps above it. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-10-31-bazel-d1-t 2026-10-31-bazel-d1-d">
+              <title id="2026-10-31-bazel-d1-t">One change, a small rebuild</title>
+              <desc id="2026-10-31-bazel-d1-d">Two libraries feed an app. Only the library whose file changed, and the app that depends on it, are rebuilt. The other library comes from the cache.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="20" y="50" width="170" height="60" rx="10"/><text class="d-text" x="105" y="77" text-anchor="middle">Library A</text><text class="d-sub" x="105" y="97" text-anchor="middle">file changed</text></g>
+              <g class="d-node" style="--i:0"><rect x="20" y="190" width="170" height="60" rx="10"/><text class="d-text" x="105" y="217" text-anchor="middle">Library B</text><text class="d-sub" x="105" y="237" text-anchor="middle">nothing changed</text></g>
+              <path class="d-edge accent" style="--i:1" d="M190 80 L290 80 L290 130 L380 130"/>
+              <path class="d-arrow" style="--i:1" d="M380 130 L370 125 L370 135 Z"/>
+              <path class="d-edge" style="--i:1" d="M190 220 L290 220 L290 170 L380 170"/>
+              <path class="d-arrow" style="--i:1" d="M380 170 L370 165 L370 175 Z"/>
+              <text class="d-label" style="--i:2" x="105" y="275" text-anchor="middle">same hash: reuse cached result</text>
+              <g class="d-node accent" style="--i:3"><rect x="380" y="120" width="170" height="60" rx="10"/><text class="d-text" x="465" y="147" text-anchor="middle">App</text><text class="d-sub" x="465" y="167" text-anchor="middle">rebuilt</text></g>
+              <path class="d-edge accent" style="--i:4" d="M550 150 L620 150"/>
+              <path class="d-arrow" style="--i:4" d="M620 150 L610 145 L610 155 Z"/>
+              <g class="d-node alt" style="--i:5"><rect x="620" y="120" width="120" height="60" rx="10"/><text class="d-text" x="680" y="147" text-anchor="middle">Tests</text><text class="d-sub" x="680" y="167" text-anchor="middle">rerun</text></g>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M190 80 L290 80 L290 130 L380 130"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The change travels only along the arrows that lead away from it. Everything else is reused.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>The same trick works across machines. Because a result depends only on its hash, it can be saved on a shared server. When you build, Bazel asks that server whether a teammate or the automated tests already produced the result, and downloads it if so. Bazel can also send the build steps themselves to a pool of remote machines, so the work runs in parallel on far more computers than your laptop.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>This only works if the inputs are truly all the inputs. If a compiler quietly read a file you never declared, or used whatever version was installed on your laptop, then the hash would match while the real result differed, and a stale answer would be reused. So Bazel pushes toward <dfn class="term" title="A build that depends only on its declared inputs.">hermetic builds</dfn>, and it can run each step in a <dfn class="term" title="A restricted space where a program sees only the files it was given.">sandbox</dfn> that exposes only the declared files. If you forgot to declare something, the build fails loudly instead of silently being wrong.</p>
+          <p>The cost is real. You must describe your dependencies carefully, and the build files are extra work to maintain. For a small project that is a poor trade. The payoff appears when the codebase and the team are big enough that waiting is the expensive part.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">To safely skip work, you first have to be strict about what the work depends on.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the core model: declared inputs and outputs, a dependency graph, content hashes as cache keys, and optional sandboxing plus remote caching and execution. I am less sure how strictly each language's rules enforce hermeticity in practice, and how tightly Bazel today matches Google's internal tool, so I made no claims there. I also left out speed figures because they vary hugely by project.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A teammate's build can make yours faster.</strong> If they built the same inputs, the result is already in the shared cache.</li>
+            <li><strong>Only the tests touched by your change rerun.</strong> The graph shows which tests depend on the files you edited.</li>
+            <li><strong>A forgotten dependency produces a baffling "file not found" error.</strong> The sandbox hid the undeclared file, which is the build being strict on purpose.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Bazel's own documentation on <a href="https://bazel.build/basics/hermeticity">hermeticity</a> and <a href="https://bazel.build/remote/caching">remote caching</a>, and the <a href="https://opensource.googleblog.com/2015/03/bazel-google-build-system-open-source.html">2015 open-source announcement</a>.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-30-aws-lambda-firecracker" data-topic="AWS Lambda and Firecracker" data-domain="Infra" data-date="2026-10-30">
       <header class="entry-head">
         <div class="entry-meta">
