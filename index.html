@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-01-twitter-home-timeline"><time datetime="2026-11-01">2026-11-01</time><span>Twitter's home timeline: why your feed is built before you open the app</span></a></li>
         <li><a href="#2026-10-31-bazel"><time datetime="2026-10-31">2026-10-31</time><span>Bazel: how a huge codebase rebuilds only what you actually changed</span></a></li>
         <li><a href="#2026-10-30-aws-lambda-firecracker"><time datetime="2026-10-30">2026-10-30</time><span>AWS Lambda: running strangers' code side by side, safely, in a blink</span></a></li>
         <li><a href="#2026-10-29-ssh"><time datetime="2026-10-29">2026-10-29</time><span>SSH: logging in across the world without sending your password</span></a></li>
@@ -272,6 +273,90 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-01-twitter-home-timeline" data-topic="Twitter home timeline fan-out" data-domain="Consumer apps" data-date="2026-11-01">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-11-01">01 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Twitter's home timeline: why your feed is built before you open the app</h2>
+        <p class="lede">You open Twitter and instantly see the latest posts from the hundreds of people you follow, newest first. The design challenge: pulling those posts together on demand is slow, and millions of people are doing it at once.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Home timeline</dt><dd>The feed you see when you open the app: recent posts from the accounts you follow, merged into one list.</dd></div>
+            <div><dt>Follower</dt><dd>Someone who has chosen to see another account's posts in their feed.</dd></div>
+            <div><dt>Fan-out</dt><dd>Taking one piece of data and delivering it to many places. One post fanning out to a thousand followers is a fan-out of a thousand.</dd></div>
+            <div><dt>Cache</dt><dd>A saved result kept somewhere fast so it can be reused instead of computed again.</dd></div>
+            <div><dt>In-memory store</dt><dd>A database that keeps its data in RAM instead of on disk, which makes reads very fast. Redis is a well-known one.</dd></div>
+            <div><dt>Hybrid</dt><dd>A mix of two approaches, using each where it works best.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Suppose you follow 300 people. The obvious way to build your <dfn class="term" title="The feed you see when you open the app: recent posts from people you follow, merged into one list.">home timeline</dfn> is to wait until you open the app, look up everyone you follow, fetch each person's latest posts, and sort them. That works for a small site. At Twitter's size it means hundreds of lookups for every single refresh, and people refresh constantly.</p>
+          <p>So Twitter flips the work around. When someone posts, the system immediately looks up that person's <dfn class="term" title="Someone who has chosen to see another account's posts.">followers</dfn> and drops the new post into a ready-made timeline list for each one. This is called <dfn class="term" title="Delivering one piece of data to many places.">fan-out</dfn> on write. Those lists live in an <dfn class="term" title="A database that keeps its data in RAM instead of on disk, so reads are very fast.">in-memory store</dfn> (Twitter used Redis for this), so when you open the app, your timeline is already waiting. Reading it is one quick lookup.</p>
+          <p>There is one catch. If an account with tens of millions of followers posts, writing into tens of millions of lists would be slow and wasteful, and those writes would pile up. So for those accounts Twitter skips the fan-out. Their posts stay in their own list, and when you open the app, the system takes your ready-made timeline and merges in the latest posts from the big accounts you follow. It is a <dfn class="term" title="A mix of two approaches, using each where it works best.">hybrid</dfn>: most of the feed is prepared ahead of time, and a small part is fetched at the moment you look.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a normal post is pushed into follower timelines ahead of time, while a celebrity post is looked up when a reader opens the app. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-01-twitter-home-timeline-d1-t 2026-11-01-twitter-home-timeline-d1-d">
+              <title id="2026-11-01-twitter-home-timeline-d1-t">Two paths into your timeline</title>
+              <desc id="2026-11-01-twitter-home-timeline-d1-d">A post is made. For ordinary accounts, a fan-out step copies it into each follower's prepared timeline list. For very large accounts, the post stays in the author's own list. When a reader opens the app, the prepared list and the large accounts' posts are merged.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="10" y="120" width="130" height="60" rx="10"/><text class="d-text" x="75" y="147" text-anchor="middle">New post</text><text class="d-sub" x="75" y="167" text-anchor="middle">someone tweets</text></g>
+              <path class="d-edge accent" style="--i:1" d="M140 140 L200 140"/>
+              <path class="d-arrow" style="--i:1" d="M200 140 L190 135 L190 145 Z"/>
+              <g class="d-node" style="--i:2"><rect x="200" y="110" width="140" height="60" rx="10"/><text class="d-text" x="270" y="137" text-anchor="middle">Fan-out</text><text class="d-sub" x="270" y="157" text-anchor="middle">to each follower</text></g>
+              <path class="d-edge accent" style="--i:3" d="M340 140 L390 140 L390 80 L430 80"/>
+              <path class="d-arrow" style="--i:3" d="M430 80 L420 75 L420 85 Z"/>
+              <text class="d-label" style="--i:4" x="470" y="48" text-anchor="middle">pushed ahead of time</text>
+              <g class="d-node accent" style="--i:4"><rect x="430" y="50" width="150" height="60" rx="10"/><text class="d-text" x="505" y="77" text-anchor="middle">Timeline list</text><text class="d-sub" x="505" y="97" text-anchor="middle">ready for you</text></g>
+              <path class="d-edge" style="--i:3" d="M75 180 L75 230 L430 230"/>
+              <path class="d-arrow" style="--i:3" d="M430 230 L420 225 L420 235 Z"/>
+              <text class="d-label" style="--i:4" x="250" y="258" text-anchor="middle">big accounts: no fan-out</text>
+              <g class="d-node" style="--i:4"><rect x="430" y="200" width="150" height="60" rx="10"/><text class="d-text" x="505" y="227" text-anchor="middle">Big account</text><text class="d-sub" x="505" y="247" text-anchor="middle">own list</text></g>
+              <path class="d-edge accent" style="--i:5" d="M580 80 L605 80 L605 140 L625 140"/>
+              <path class="d-arrow" style="--i:5" d="M625 140 L615 135 L615 145 Z"/>
+              <path class="d-edge" style="--i:5" d="M580 230 L605 230 L605 160 L625 160"/>
+              <path class="d-arrow" style="--i:5" d="M625 160 L615 155 L615 165 Z"/>
+              <g class="d-node alt" style="--i:6"><rect x="625" y="120" width="125" height="60" rx="10"/><text class="d-text" x="687" y="147" text-anchor="middle">You open</text><text class="d-sub" x="687" y="167" text-anchor="middle">merge the two</text></g>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M140 140 L390 140 L390 80 L605 80 L605 140 L625 140"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Most posts travel the top path while you are not looking. Only the big accounts' posts are fetched when you open the app.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The reason is the ratio between reading and writing. In a 2013 talk, a Twitter engineer said timelines were read around 300,000 times per second, while new posts arrived at a few thousand per second. That is roughly a hundred reads for every write. When reads vastly outnumber writes, it pays to do extra work at write time so each read becomes almost free.</p>
+          <p>The trade-off is that writes get expensive when an author has a huge audience. Skipping fan-out for the biggest accounts caps that cost, at the price of a little extra work whenever you open the app. Prepared timelines also take storage: Twitter keeps only a limited number of recent posts per list, which is fine because almost nobody scrolls back far.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">When many more people read than write, do the hard work once, when the post is written.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the core idea (fan-out on write into cached timelines, with large accounts handled at read time), because Twitter engineers described it publicly. Those talks are from around 2012 to 2013. Twitter, now X, has since changed a lot, including how posts are ranked and mixed with recommendations, so I am not claiming this is exactly how it runs today. The read and write rates are what was quoted back then, not current figures, and the cutoff for "big account" is something I do not know.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>The feed loads instantly.</strong> Your list was assembled while you were away, so opening the app is mostly one lookup.</li>
+            <li><strong>A new follow does not backfill perfectly at once.</strong> Your list only gets new posts from the moment of following; older ones have to be fetched separately.</li>
+            <li><strong>Posts from huge accounts can show up slightly out of step with the rest.</strong> They are merged in when you look, instead of delivered ahead of time.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Raffi Krikorian's <a href="https://www.infoq.com/presentations/Twitter-Timeline-Scalability/">"Timelines at Scale" talk on InfoQ</a> (2013) and Twitter's engineering post <a href="https://blog.x.com/engineering/en_us/topics/infrastructure/2017/the-infrastructure-behind-twitter-scale">"The Infrastructure Behind Twitter: Scale"</a> (2017).</p>
+      </div>
+    </article>
     <article class="entry" id="2026-10-31-bazel" data-topic="Bazel" data-domain="Dev tools" data-date="2026-10-31">
       <header class="entry-head">
         <div class="entry-meta">
