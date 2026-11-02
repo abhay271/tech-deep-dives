@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-02-webrtc"><time datetime="2026-11-02">2026-11-02</time><span>WebRTC: how a video call finds a path between two laptops</span></a></li>
         <li><a href="#2026-11-01-twitter-home-timeline"><time datetime="2026-11-01">2026-11-01</time><span>Twitter's home timeline: why your feed is built before you open the app</span></a></li>
         <li><a href="#2026-10-31-bazel"><time datetime="2026-10-31">2026-10-31</time><span>Bazel: how a huge codebase rebuilds only what you actually changed</span></a></li>
         <li><a href="#2026-10-30-aws-lambda-firecracker"><time datetime="2026-10-30">2026-10-30</time><span>AWS Lambda: running strangers' code side by side, safely, in a blink</span></a></li>
@@ -273,6 +274,93 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-02-webrtc" data-topic="WebRTC" data-domain="Protocols" data-date="2026-11-02">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-11-02">02 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">WebRTC: how a video call finds a path between two laptops</h2>
+        <p class="lede">You click a link and, a few seconds later, you see and hear someone live in your browser, with no install. The design challenge: your laptop and theirs both sit behind home routers that refuse unsolicited connections, so how do they ever reach each other?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>WebRTC</dt><dd>A set of standards built into browsers and phone apps for sending live audio, video and data between devices.</dd></div>
+            <div><dt>NAT</dt><dd>The feature of a home router that lets many devices share one public address. It drops incoming traffic that nobody inside asked for.</dd></div>
+            <div><dt>Signaling</dt><dd>The "let's set up a call" conversation, where the two sides swap the details they need to connect. WebRTC leaves it up to each app.</dd></div>
+            <div><dt>STUN server</dt><dd>A small public server that tells you what your address looks like from the outside internet.</dd></div>
+            <div><dt>TURN server</dt><dd>A public server that relays your call data when a direct connection is impossible.</dd></div>
+            <div><dt>SFU</dt><dd>Selective Forwarding Unit: a server that receives each person's video and forwards copies to everyone else in a group call, without mixing them together.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Think about what a call needs: your video has to go straight to the other person, quickly. Sending it through a company's server would add delay and a huge bandwidth bill. But the internet is not built for two home computers to talk directly. Your router uses <dfn class="term" title="A router feature that lets many devices share one public address and blocks unrequested incoming traffic.">NAT</dfn>: it lets your traffic out, and only lets replies back in. A stranger's packet arriving out of nowhere is thrown away.</p>
+          <p><dfn class="term" title="Browser and app standards for live audio, video and data between devices.">WebRTC</dfn> solves this in steps. First, the two sides use <dfn class="term" title="The setup conversation where both sides swap connection details. WebRTC does not define it; each app builds its own.">signaling</dfn>, which is just an ordinary website connection to the app's server. They swap a description of what they can do (video formats, encryption keys) and a list of addresses where they might be reachable.</p>
+          <p>Where do those addresses come from? Your device asks a <dfn class="term" title="A public server that tells you what your address looks like from outside.">STUN server</dfn>: "what address do you see me coming from?" The answer is your public address. Now each side has a list of candidates: its local address, its public address, and more. Both sides then try pairs of them at the same moment. Since each side is sending out toward the other, each router sees outgoing traffic and lets the matching replies in. This is called hole punching, and it is part of a process named ICE, which picks the best pair that works.</p>
+          <p>If no pair works (some strict networks block it), the call falls back to a <dfn class="term" title="A public server that relays call data when a direct path is impossible.">TURN server</dfn>. Both sides send to it and it passes everything along. The call works, but it costs the app real bandwidth and adds a bit of delay.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: two browsers swap details through a signaling server, learn their public addresses from a STUN server, then send media directly to each other. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-02-webrtc-d1-t 2026-11-02-webrtc-d1-d">
+              <title id="2026-11-02-webrtc-d1-t">Setting up a call, then going direct</title>
+              <desc id="2026-11-02-webrtc-d1-d">Two browsers each talk to a signaling server to swap connection details and to a STUN server to learn their public address. Once they know each other's addresses, video flows directly between them.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="20" y="120" width="140" height="60" rx="10"/><text class="d-text" x="90" y="147" text-anchor="middle">You</text><text class="d-sub" x="90" y="167" text-anchor="middle">browser</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="600" y="120" width="140" height="60" rx="10"/><text class="d-text" x="670" y="147" text-anchor="middle">Friend</text><text class="d-sub" x="670" y="167" text-anchor="middle">browser</text></g>
+              <g class="d-node" style="--i:2"><rect x="290" y="20" width="180" height="60" rx="10"/><text class="d-text" x="380" y="47" text-anchor="middle">Signaling server</text><text class="d-sub" x="380" y="67" text-anchor="middle">swap details</text></g>
+              <g class="d-node" style="--i:3"><rect x="290" y="220" width="180" height="60" rx="10"/><text class="d-text" x="380" y="247" text-anchor="middle">STUN server</text><text class="d-sub" x="380" y="267" text-anchor="middle">"your address is…"</text></g>
+              <path class="d-edge" style="--i:1" d="M90 120 L90 50 L290 50"/>
+              <path class="d-arrow" style="--i:1" d="M290 50 L280 45 L280 55 Z"/>
+              <path class="d-edge" style="--i:1" d="M670 120 L670 50 L470 50"/>
+              <path class="d-arrow" style="--i:1" d="M470 50 L480 45 L480 55 Z"/>
+              <path class="d-edge" style="--i:2" d="M90 180 L90 250 L290 250"/>
+              <path class="d-arrow" style="--i:2" d="M290 250 L280 245 L280 255 Z"/>
+              <path class="d-edge" style="--i:2" d="M670 180 L670 250 L470 250"/>
+              <path class="d-arrow" style="--i:2" d="M470 250 L480 245 L480 255 Z"/>
+              <path class="d-edge accent" style="--i:4" d="M160 150 L600 150"/>
+              <path class="d-arrow" style="--i:4" d="M600 150 L590 145 L590 155 Z"/>
+              <text class="d-label" style="--i:5" x="380" y="140" text-anchor="middle">direct video and audio</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 150 L600 150"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The servers only help the two browsers meet. Once they have each other's addresses, the video itself skips the servers.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <section class="reveal">
+          <p>Group calls change the picture. If ten people all sent video directly to each other, each laptop would upload nine copies of its own video. So most group-call apps put a <dfn class="term" title="A server that receives each person's video and forwards copies to the others without mixing them.">SFU</dfn> in the middle. You upload once, and the server forwards your stream to everyone else. It can even send each viewer a lower-quality copy if their connection is weak.</p>
+        </section>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The constraint is that live conversation tolerates almost no delay but a lot of damage. A video frame that arrives late is useless, while a lost one is barely noticed. That is why WebRTC sends media over UDP, which does not stop to resend lost packets, unlike the web's usual TCP. The software adapts instead: it lowers quality when the network gets worse.</p>
+          <p>The trade-off is complexity and cost. Direct paths are cheapest and fastest, but they depend on hole punching working. Relays always work but cost money, and group calls need servers anyway. Real apps end up running all three kinds of server. Everything is also encrypted by default, so even a relay or SFU on the path cannot casually watch your call.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Servers help two devices meet; whenever possible, the call itself skips them.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the overall flow (signaling, STUN, ICE, TURN fallback, encrypted media, SFUs for groups), because it is standardized and widely documented. I am less sure of the exact share of calls that need a relay, which varies by network and app, so I give no figure. I also simplified: real ICE gathers more kinds of candidates, and "encrypted by default" means encrypted between you and the next hop. An SFU can still see media unless the app adds extra end-to-end encryption.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Calls sometimes take a few seconds to "connect".</strong> The two sides are trying many address pairs and picking the best one that works.</li>
+            <li><strong>A call can work on home Wi-Fi but fail on a strict office network.</strong> The office firewall may block hole punching and the relay path, or at least force the slower one.</li>
+            <li><strong>Video gets blocky instead of freezing when your connection dips.</strong> Late packets are dropped and quality is lowered rather than waiting for a perfect picture.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the <a href="https://webrtc.org/">WebRTC project site</a>, <a href="https://www.rfc-editor.org/rfc/rfc8445">RFC 8445 (ICE)</a>, <a href="https://www.rfc-editor.org/rfc/rfc8489">RFC 8489 (STUN)</a> and <a href="https://www.rfc-editor.org/rfc/rfc8656">RFC 8656 (TURN)</a>. Not re-checked live in this run; written from the standards as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-01-twitter-home-timeline" data-topic="Twitter home timeline fan-out" data-domain="Consumer apps" data-date="2026-11-01">
       <header class="entry-head">
         <div class="entry-meta">
