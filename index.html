@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-03-go-scheduler"><time datetime="2026-11-03">2026-11-03</time><span>Go's scheduler: how a server juggles a million tasks on a handful of threads</span></a></li>
         <li><a href="#2026-11-02-webrtc"><time datetime="2026-11-02">2026-11-02</time><span>WebRTC: how a video call finds a path between two laptops</span></a></li>
         <li><a href="#2026-11-01-twitter-home-timeline"><time datetime="2026-11-01">2026-11-01</time><span>Twitter's home timeline: why your feed is built before you open the app</span></a></li>
         <li><a href="#2026-10-31-bazel"><time datetime="2026-10-31">2026-10-31</time><span>Bazel: how a huge codebase rebuilds only what you actually changed</span></a></li>
@@ -274,6 +275,90 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-03-go-scheduler" data-topic="Go goroutine scheduler" data-domain="OS/runtime internals" data-date="2026-11-03">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">OS/runtime internals</span>
+          <time datetime="2026-11-03">03 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Go's scheduler: how a server juggles a million tasks on a handful of threads</h2>
+        <p class="lede">A Go web server happily starts one new task for every incoming request, even when a hundred thousand are in flight at once. The design challenge: operating-system threads are heavy, so how can a program have that many things "running" at the same time?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Goroutine</dt><dd>Go's name for a lightweight task. You start one by writing <code>go</code> in front of a function call.</dd></div>
+            <div><dt>Thread</dt><dd>A unit of work the operating system schedules onto a CPU core. Each one costs real memory and switching between them is slow-ish.</dd></div>
+            <div><dt>Scheduler</dt><dd>The code that decides which task runs next on which thread.</dd></div>
+            <div><dt>Blocking call</dt><dd>An operation that makes a task wait, for example reading from the network or a file, until the answer arrives.</dd></div>
+            <div><dt>Work stealing</dt><dd>When a worker runs out of tasks, it takes some from a busier worker's queue instead of sitting idle.</dd></div>
+            <div><dt>Preemption</dt><dd>Interrupting a task that has been running a long time so that others get a turn.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Picture a chat server. Each connected user needs some code that reads their messages, waits, and replies. The simplest way to write that is one task per user. If every task were an operating-system <dfn class="term" title="A unit of execution scheduled by the operating system onto a CPU core.">thread</dfn>, a hundred thousand users would mean a hundred thousand threads, each reserving a large chunk of memory and each needing the OS to switch to it.</p>
+          <p>Go avoids this. Its tasks, called <dfn class="term" title="Go's lightweight task, started by putting the word go before a function call.">goroutines</dfn>, are managed by Go's own <dfn class="term" title="The code that decides which task runs next, and on which thread.">scheduler</dfn> inside your program, not by the OS. A goroutine starts with a tiny stack (a couple of kilobytes, which grows when needed), so you can afford very many of them.</p>
+          <p>Underneath, Go runs only a small pool of real threads, roughly one per CPU core by default. Each thread has a slot called a <strong>P</strong> (a processor), and each P owns a queue of goroutines waiting to run. A thread takes a goroutine from its P's queue, runs it, and when that goroutine finishes or has to wait, takes the next. Because switching happens inside the program, it is far cheaper than asking the OS to switch.</p>
+          <p>Two details keep the cores busy. First, when a P's queue is empty, its thread does <dfn class="term" title="An idle worker takes tasks from a busier worker's queue instead of sitting idle.">work stealing</dfn>: it grabs half of another P's queue. Second, when a goroutine hits a <dfn class="term" title="An operation that makes a task wait until something outside arrives, like network data.">blocking call</dfn>, the scheduler does not let the thread sit stuck. For network waits, the goroutine is parked and a background poller wakes it when data arrives. For calls that truly block the thread, the P is handed to another thread so the other goroutines keep running.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: many goroutines wait in queues; a few threads, each with a processor slot, pick them up and run them on CPU cores. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-03-go-scheduler-d1-t 2026-11-03-go-scheduler-d1-d">
+              <title id="2026-11-03-go-scheduler-d1-t">Many goroutines, few threads</title>
+              <desc id="2026-11-03-go-scheduler-d1-d">Two queues of waiting goroutines each feed one processor slot with a thread. An idle slot can steal work from the other queue. A network poller wakes goroutines that were waiting for data.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="40" width="190" height="60" rx="10"/><text class="d-text" x="115" y="67" text-anchor="middle">Queue A</text><text class="d-sub" x="115" y="87" text-anchor="middle">many goroutines</text></g>
+              <g class="d-node" style="--i:0"><rect x="20" y="200" width="190" height="60" rx="10"/><text class="d-text" x="115" y="227" text-anchor="middle">Queue B</text><text class="d-sub" x="115" y="247" text-anchor="middle">nearly empty</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="320" y="40" width="170" height="60" rx="10"/><text class="d-text" x="405" y="67" text-anchor="middle">Thread 1</text><text class="d-sub" x="405" y="87" text-anchor="middle">runs a goroutine</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="320" y="200" width="170" height="60" rx="10"/><text class="d-text" x="405" y="227" text-anchor="middle">Thread 2</text><text class="d-sub" x="405" y="247" text-anchor="middle">runs a goroutine</text></g>
+              <g class="d-node alt" style="--i:4"><rect x="600" y="120" width="140" height="60" rx="10"/><text class="d-text" x="670" y="147" text-anchor="middle">Network poller</text><text class="d-sub" x="670" y="167" text-anchor="middle">"data arrived"</text></g>
+              <path class="d-edge" style="--i:1" d="M210 70 L320 70"/>
+              <path class="d-arrow" style="--i:1" d="M320 70 L310 65 L310 75 Z"/>
+              <path class="d-edge" style="--i:1" d="M210 230 L320 230"/>
+              <path class="d-arrow" style="--i:1" d="M320 230 L310 225 L310 235 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M115 100 L115 150 L350 150 L350 200"/>
+              <path class="d-arrow" style="--i:3" d="M350 200 L345 190 L355 190 Z"/>
+              <text class="d-label" style="--i:3" x="232" y="142" text-anchor="middle">steal</text>
+              <path class="d-edge" style="--i:5" d="M600 150 L540 150 L540 70 L490 70"/>
+              <path class="d-arrow" style="--i:5" d="M490 70 L500 65 L500 75 Z"/>
+              <text class="d-label" style="--i:5" x="570" y="112" text-anchor="middle">wake up</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M210 70 L320 70"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M115 100 L115 150 L350 150 L350 200"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Thousands of goroutines wait in queues; a few threads run them. A thread whose queue is empty steals from another, and the poller wakes goroutines whose data arrived.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The constraint is that most server work is waiting. A request spends nearly all its life waiting on a database or a network reply, and only a sliver actually computing. Dedicating an OS thread to each waiting task wastes memory and forces the OS to juggle huge numbers of them. Go's bet is to make waiting nearly free, so programmers can write simple "one task per request" code that reads top to bottom, instead of tangled callbacks.</p>
+          <p>The trade-off is that the runtime becomes more complicated, and it has to be fair on its own. Early versions only switched goroutines at certain points, such as function calls, so a tight loop could hog a thread. Newer versions can interrupt a goroutine that runs too long (preemption). Also, goroutines share memory, so you still need care, and a million sleeping goroutines are cheap but not free.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Go makes waiting cheap, so you can write simple code and still serve enormous crowds.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the overall model (goroutines, threads, P queues, work stealing, a network poller, runtime preemption). I am less sure of exact details such as the starting stack size and the precise Go version that added each behavior, which have changed over time, so I kept those vague. I also left out many internals, like the global queue and how threads are parked.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Go programs can have hundreds of thousands of goroutines without falling over.</strong> Each is small and parked cheaply while it waits.</li>
+            <li><strong>A Go server uses all your CPU cores without you asking.</strong> The pool of threads is sized to the core count and work stealing spreads tasks across them.</li>
+            <li><strong>One slow database call does not freeze the rest of the server.</strong> The waiting goroutine steps aside and the thread moves on to another one.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the <a href="https://go.dev/src/runtime/HACKING">Go runtime notes (HACKING.md)</a>, the <a href="https://go.dev/doc/go1.14">Go 1.14 release notes</a> (asynchronous preemption) and Dmitry Vyukov's scheduler design document. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-02-webrtc" data-topic="WebRTC" data-domain="Protocols" data-date="2026-11-02">
       <header class="entry-head">
         <div class="entry-meta">
