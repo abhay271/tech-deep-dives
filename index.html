@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-04-clickhouse"><time datetime="2026-11-04">2026-11-04</time><span>ClickHouse: why analytics databases store tables sideways</span></a></li>
         <li><a href="#2026-11-03-go-scheduler"><time datetime="2026-11-03">2026-11-03</time><span>Go's scheduler: how a server juggles a million tasks on a handful of threads</span></a></li>
         <li><a href="#2026-11-02-webrtc"><time datetime="2026-11-02">2026-11-02</time><span>WebRTC: how a video call finds a path between two laptops</span></a></li>
         <li><a href="#2026-11-01-twitter-home-timeline"><time datetime="2026-11-01">2026-11-01</time><span>Twitter's home timeline: why your feed is built before you open the app</span></a></li>
@@ -275,6 +276,83 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-04-clickhouse" data-topic="ClickHouse columnar storage" data-domain="Databases" data-date="2026-11-04">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-11-04">04 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">ClickHouse: why analytics databases store tables sideways</h2>
+        <p class="lede">A dashboard asks, "how many page views did we get per country over the last billion events?" and gets an answer in a second or two. The design challenge: an ordinary database is built to fetch one whole row quickly, but this question touches almost every row and only cares about a couple of fields.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Row-oriented storage</dt><dd>Saving a table one row at a time, so all the fields of one record sit next to each other on disk. Great for "load this user's profile".</dd></div>
+            <div><dt>Column-oriented storage</dt><dd>Saving a table one column at a time, so all the values of one field sit next to each other on disk. Great for "add up this one field across everything".</dd></div>
+            <div><dt>Compression</dt><dd>Storing data in fewer bytes by exploiting repetition. Similar neighbouring values compress very well.</dd></div>
+            <div><dt>Vectorized execution</dt><dd>Processing values in big batches, thousands at a time, instead of one at a time. It keeps the CPU busy doing the same simple step over and over.</dd></div>
+            <div><dt>Sparse index</dt><dd>An index that keeps one entry for every chunk of rows rather than for every row, so it stays tiny but can still skip most of the data.</dd></div>
+            <div><dt>Analytics (OLAP)</dt><dd>Questions that summarise lots of data, like totals and averages, as opposed to everyday app work (OLTP) like updating one order.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine a table of page views with twenty fields: time, country, browser, URL, user id, and so on. A normal database uses <dfn class="term" title="Saving a table one row at a time, so one record's fields sit together on disk.">row-oriented storage</dfn>. To total up views per country, it still has to read every row in full, all twenty fields, just to look at one of them. Most of that reading is wasted.</p>
+          <p><a href="https://clickhouse.com/docs">ClickHouse</a>, a database made for <dfn class="term" title="Online analytical processing: questions that summarise lots of data, like totals and averages.">analytics</dfn>, flips the layout. It uses <dfn class="term" title="Saving a table one column at a time, so one field's values sit together on disk.">column-oriented storage</dfn>: the country values are stored together in one file, the browser values in another, and so on. The question above reads only the country file (and maybe the time file), and ignores the other eighteen entirely.</p>
+          <p>Storing columns separately helps in three more ways. Values in one column look alike (a million countries, all short words, many repeated), so <dfn class="term" title="Storing data in fewer bytes by exploiting repetition.">compression</dfn> works far better than on mixed rows. Less data on disk means less to read. Next, data is kept sorted by a chosen key, with a <dfn class="term" title="An index with one entry per chunk of rows instead of per row, small enough to stay in memory.">sparse index</dfn> that notes where each chunk begins, so a query for one day can skip every chunk outside it. Finally, the engine uses <dfn class="term" title="Processing values in big batches instead of one at a time, which keeps the CPU efficient.">vectorized execution</dfn>: it adds up a whole block of country-sized values in one tight loop, which modern CPUs are very good at.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a query for views per country reads only the country column file and skips the other column files. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-04-clickhouse-d1-t 2026-11-04-clickhouse-d1-d">
+              <title id="2026-11-04-clickhouse-d1-t">A column store reads only what the query needs</title>
+              <desc id="2026-11-04-clickhouse-d1-d">A query asks for views per country. Three column files exist on disk: country, browser and URL. Only the country file is read; the others are skipped. The result is a small table of totals.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="20" y="120" width="150" height="60" rx="10"/><text class="d-text" x="95" y="147" text-anchor="middle">Query</text><text class="d-sub" x="95" y="167" text-anchor="middle">views per country</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="300" y="30" width="170" height="60" rx="10"/><text class="d-text" x="385" y="57" text-anchor="middle">country column</text><text class="d-sub" x="385" y="77" text-anchor="middle">read this</text></g>
+              <g class="d-node" style="--i:3"><rect x="300" y="120" width="170" height="60" rx="10"/><text class="d-text" x="385" y="147" text-anchor="middle">browser column</text><text class="d-sub" x="385" y="167" text-anchor="middle">skipped</text></g>
+              <g class="d-node" style="--i:3"><rect x="300" y="210" width="170" height="60" rx="10"/><text class="d-text" x="385" y="237" text-anchor="middle">URL column</text><text class="d-sub" x="385" y="257" text-anchor="middle">skipped</text></g>
+              <g class="d-node alt" style="--i:5"><rect x="590" y="120" width="150" height="60" rx="10"/><text class="d-text" x="665" y="147" text-anchor="middle">Totals</text><text class="d-sub" x="665" y="167" text-anchor="middle">one row per country</text></g>
+              <path class="d-edge accent" style="--i:1" d="M170 140 L235 140 L235 60 L300 60"/>
+              <path class="d-arrow" style="--i:1" d="M300 60 L290 55 L290 65 Z"/>
+              <path class="d-edge" style="--i:4" d="M470 60 L530 60 L530 140 L590 140"/>
+              <path class="d-arrow" style="--i:4" d="M590 140 L580 135 L580 145 Z"/>
+              <text class="d-label" style="--i:3" x="545" y="205" text-anchor="middle">never touched</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 140 L235 140 L235 60 L300 60"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The query follows only the country column. The other columns stay on disk, unread.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The constraint is that reading from disk and memory is the slow part, so the fastest query is the one that reads the least. Analytics questions usually touch a few fields across a huge number of rows, which is exactly where row storage wastes the most effort.</p>
+          <p>The trade-off is that the same layout is bad at the opposite job. Fetching or changing one full record means touching every column file, and editing a single row in place is awkward. So ClickHouse is built for data that is written in big batches and rarely changed, and it is not a replacement for the database behind your shopping cart. Many companies run both: a row database for the app, and a column database fed from it for reports.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">The fastest way to answer a question over a billion rows is to avoid reading most of them.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the core ideas: columnar layout, per-column compression, sorted data with a sparse index, and batch-at-a-time processing. I left out how background merging of data parts works and how clusters are split across servers, and I did not re-check current feature details live, so treat specifics beyond the big picture as approximate.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Dashboards over huge event logs feel instant.</strong> They read one or two columns, skip most chunks, and crunch what is left in batches.</li>
+            <li><strong>Analytics data takes much less disk than you would expect.</strong> Similar values stored together compress well.</li>
+            <li><strong>Companies keep a separate "warehouse" next to the app database.</strong> The layout that makes reports fast makes single-record updates slow, so one system rarely does both well.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the <a href="https://clickhouse.com/docs/en/development/architecture">ClickHouse architecture overview</a> and the <a href="https://clickhouse.com/docs/en/guides/best-practices/sparse-primary-indexes">sparse primary index guide</a>. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-03-go-scheduler" data-topic="Go goroutine scheduler" data-domain="OS/runtime internals" data-date="2026-11-03">
       <header class="entry-head">
         <div class="entry-meta">
