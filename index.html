@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-05-stripe-idempotency"><time datetime="2026-11-05">2026-11-05</time><span>Stripe's idempotency keys: how a payment API survives a dropped connection</span></a></li>
         <li><a href="#2026-11-04-clickhouse"><time datetime="2026-11-04">2026-11-04</time><span>ClickHouse: why analytics databases store tables sideways</span></a></li>
         <li><a href="#2026-11-03-go-scheduler"><time datetime="2026-11-03">2026-11-03</time><span>Go's scheduler: how a server juggles a million tasks on a handful of threads</span></a></li>
         <li><a href="#2026-11-02-webrtc"><time datetime="2026-11-02">2026-11-02</time><span>WebRTC: how a video call finds a path between two laptops</span></a></li>
@@ -276,6 +277,84 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-05-stripe-idempotency" data-topic="Stripe idempotency keys" data-domain="Infra" data-date="2026-11-05">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-11-05">05 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Stripe's idempotency keys: how a payment API survives a dropped connection</h2>
+        <p class="lede">You tap "Pay" and your phone loses signal at the worst moment. Did the charge go through? The app can't tell, and retrying might charge you twice. The design challenge: on an unreliable network, how do you let a client safely try again when money is involved?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Timeout</dt><dd>When the client gives up waiting for a reply. It does not mean the server did nothing; the server may have finished the work and the answer just got lost.</dd></div>
+<div><dt>Idempotent</dt><dd>An operation you can repeat any number of times and still get the same end result as doing it once. Setting a light switch to "on" is idempotent; flipping it is not.</dd></div>
+            <div><dt>Idempotency key</dt><dd>A unique label the client attaches to a request, like a random string, so the server can recognise "this is the same request again".</dd></div>
+            <div><dt>Retry</dt><dd>Sending the same request again after a failure or a timeout, hoping this time it works.</dd></div>
+                        <div><dt>Backoff with jitter</dt><dd>Waiting a little longer before each retry, plus a random extra bit, so thousands of clients don't all retry at the same instant.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say a shop's server asks <a href="https://stripe.com/docs/api/idempotent_requests">Stripe</a> to charge a customer 20 dollars. The request leaves, Stripe charges the card, and then the reply is lost on the way back. The shop sees a <dfn class="term" title="The client gave up waiting for a reply. The work may or may not have happened.">timeout</dfn>. It has two bad options: give up (maybe the customer never paid) or try again (maybe they pay twice).</p>
+          <p>Stripe's answer is to make the request <dfn class="term" title="Repeating it gives the same end result as doing it once.">idempotent</dfn> on purpose. The client creates a random <dfn class="term" title="A unique label on a request so the server can recognise a repeat of it.">idempotency key</dfn> and sends it in a header with the first request. Stripe remembers the key together with the result it produced. If the same key arrives again, Stripe does not charge again. It just replays the saved answer, even if the first attempt had failed halfway or returned an error.</p>
+          <p>That turns a scary <dfn class="term" title="Sending the same request again after a failure.">retry</dfn> into a safe one. The client rule becomes simple: new payment, new key; same payment being retried, same key.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a charge request with a key succeeds but the reply is lost; the retry with the same key gets the saved result. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-05-stripe-idempotency-d1-t 2026-11-05-stripe-idempotency-d1-d">
+              <title id="2026-11-05-stripe-idempotency-d1-t">A retry with the same key returns the saved result</title>
+              <desc id="2026-11-05-stripe-idempotency-d1-d">A shop server sends a charge request with a key to Stripe. Stripe charges the card and saves the result under the key. The reply is lost. The shop retries with the same key and Stripe returns the saved result without charging again.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="20" y="110" width="150" height="70" rx="10"/><text class="d-text" x="95" y="140" text-anchor="middle">Shop server</text><text class="d-sub" x="95" y="162" text-anchor="middle">key: abc123</text></g>
+              <g class="d-node" style="--i:2"><rect x="300" y="110" width="160" height="70" rx="10"/><text class="d-text" x="380" y="140" text-anchor="middle">Stripe API</text><text class="d-sub" x="380" y="162" text-anchor="middle">checks the key</text></g>
+              <g class="d-node alt" style="--i:4"><rect x="590" y="30" width="150" height="60" rx="10"/><text class="d-text" x="665" y="57" text-anchor="middle">Card charge</text><text class="d-sub" x="665" y="77" text-anchor="middle">happens once</text></g>
+              <g class="d-node alt" style="--i:5"><rect x="590" y="200" width="150" height="60" rx="10"/><text class="d-text" x="665" y="227" text-anchor="middle">Saved result</text><text class="d-sub" x="665" y="247" text-anchor="middle">stored under abc123</text></g>
+              <path class="d-edge accent" style="--i:1" d="M170 145 L300 145"/>
+              <path class="d-arrow" style="--i:1" d="M300 145 L290 140 L290 150 Z"/>
+              <path class="d-edge" style="--i:3" d="M460 130 L525 130 L525 60 L590 60"/>
+              <path class="d-arrow" style="--i:3" d="M590 60 L580 55 L580 65 Z"/>
+              <path class="d-edge" style="--i:5" d="M460 160 L525 160 L525 230 L590 230"/>
+              <path class="d-arrow" style="--i:5" d="M590 230 L580 225 L580 235 Z"/>
+              <text class="d-label" style="--i:6" x="235" y="100" text-anchor="middle">retry: same key</text>
+              <text class="d-label" style="--i:6" x="380" y="260" text-anchor="middle">reply lost, so replay saved result</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 145 L300 145"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The first request does the real work and saves the outcome. A retry with the same key only reads that saved outcome.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The constraint is that networks fail in the middle, and a client can never know whether a lost reply means "nothing happened" or "it all happened". For many requests, like reading a page, a repeat is harmless. For "move money", it is not. Rather than tell every developer to be careful, Stripe moves the safety into the server, where one careful implementation protects everyone.</p>
+          <p>The trade-off is cost and bookkeeping. Stripe has to store every key and result, and it can't keep them forever, so keys expire after a while (Stripe's docs say at least 24 hours). The server also has to cope with the hard cases: two copies of the same request arriving at once, or a key being reused for a different request, which Stripe rejects as an error rather than guess. Stripe's engineers also describe splitting a request into small steps and recording progress after each one, so a retry can pick up where a crashed attempt stopped.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">You can't make the network reliable, so you make retrying safe.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I am confident about the header, the "save the first result and replay it" behaviour, and the expiry of keys. The step-by-step progress recording comes from Stripe's engineering blog post on the topic, and I am describing it loosely; I did not re-check exact retention times or error codes live, so check the current docs before relying on them.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Pressing "Pay" twice rarely charges you twice.</strong> Well-built checkouts reuse one key per order, so the second press just replays the first answer.</li>
+            <li><strong>Good API clients wait longer between retries.</strong> <dfn class="term" title="Waiting longer before each retry, plus a random extra bit, so clients don't all retry at once.">Backoff with jitter</dfn> stops a brief outage from turning into a stampede of retries.</li>
+            <li><strong>Other APIs that move money or place orders offer the same header.</strong> Whenever a repeat is costly, the safe design is to let the client prove "this is the same request".</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Stripe's API docs on <a href="https://stripe.com/docs/api/idempotent_requests">idempotent requests</a> and the Stripe engineering post "Designing robust and predictable APIs with idempotency". Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-04-clickhouse" data-topic="ClickHouse columnar storage" data-domain="Databases" data-date="2026-11-04">
       <header class="entry-head">
         <div class="entry-meta">
