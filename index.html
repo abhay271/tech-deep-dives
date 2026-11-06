@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-06-find-my-airtag"><time datetime="2026-11-06">2026-11-06</time><span>Apple Find My: how a keyring with no internet shows up on a map</span></a></li>
         <li><a href="#2026-11-05-stripe-idempotency"><time datetime="2026-11-05">2026-11-05</time><span>Stripe's idempotency keys: how a payment API survives a dropped connection</span></a></li>
         <li><a href="#2026-11-04-clickhouse"><time datetime="2026-11-04">2026-11-04</time><span>ClickHouse: why analytics databases store tables sideways</span></a></li>
         <li><a href="#2026-11-03-go-scheduler"><time datetime="2026-11-03">2026-11-03</time><span>Go's scheduler: how a server juggles a million tasks on a handful of threads</span></a></li>
@@ -277,6 +278,85 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-06-find-my-airtag" data-topic="Apple Find My and AirTag" data-domain="Consumer apps" data-date="2026-11-06">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-11-06">06 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Apple's Find My: how a keyring with no internet connection shows up on a map</h2>
+        <p class="lede">You drop an AirTag in a taxi and later see it moving across town on your phone. But the tag has no GPS and no mobile data. The design challenge: how do you locate a dumb tag using strangers' phones, without those strangers, or Apple, learning where you or the tag are?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Bluetooth Low Energy (BLE)</dt><dd>A short-range, very low-power radio signal. A tag can "shout" a tiny message over it for months on a coin battery.</dd></div>
+            <div><dt>Public/private key pair</dt><dd>Two linked secret-number strings. Anything locked with the public one can only be unlocked with the private one, so you can hand out the public one freely.</dd></div>
+            <div><dt>Encryption</dt><dd>Scrambling data so only someone holding the right key can read it.</dd></div>
+            <div><dt>Key rotation</dt><dd>Regularly switching to a fresh key, so that old and new messages can't be linked to the same sender.</dd></div>
+            <div><dt>Crowd-sourced network</dt><dd>A system where ordinary users' devices do a small job for everyone else, here relaying a tag's location.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>An AirTag cannot call anyone. All it can do is send out a tiny <dfn class="term" title="A short-range, very low-power radio signal.">Bluetooth Low Energy</dfn> message every few seconds. That message contains a <dfn class="term" title="One half of a linked pair of keys. Data locked with the public half can only be opened with the private half.">public key</dfn>, not a name or serial number.</p>
+          <p>Any nearby iPhone, iPad or Mac that hears it does three things. It notes its own location. It <dfn class="term" title="Scrambling data so only the holder of the matching key can read it.">encrypts</dfn> that location using the tag's public key. Then it uploads the result to Apple, labelled only with a fingerprint (a hash) of that key. The passer-by never sees a notification and never learns whose tag it was.</p>
+          <p>Back home, your phone knows the matching <em>private</em> key, because it was set up when you paired the tag. When you open the app, it asks Apple for any reports labelled with the fingerprints it expects, downloads them and decrypts them locally. Apple holds only locked boxes it cannot open.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a tag broadcasts its public key, a stranger's phone encrypts its location and uploads it, the owner's phone downloads and decrypts. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-06-find-my-airtag-d1-t 2026-11-06-find-my-airtag-d1-d">
+              <title id="2026-11-06-find-my-airtag-d1-t">Location reports travel through a stranger's phone, locked for the owner</title>
+              <desc id="2026-11-06-find-my-airtag-d1-d">A tag broadcasts a public key over Bluetooth to a stranger's phone. The stranger's phone encrypts its location with that key and uploads it to Apple. The owner's phone downloads the encrypted report and decrypts it with the private key.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="40" width="150" height="70" rx="10"/><text class="d-text" x="95" y="70" text-anchor="middle">Tag</text><text class="d-sub" x="95" y="92" text-anchor="middle">shouts a public key</text></g>
+              <g class="d-node alt" style="--i:2"><rect x="300" y="40" width="170" height="70" rx="10"/><text class="d-text" x="385" y="70" text-anchor="middle">Stranger's phone</text><text class="d-sub" x="385" y="92" text-anchor="middle">locks its location</text></g>
+              <g class="d-node" style="--i:4"><rect x="590" y="40" width="150" height="70" rx="10"/><text class="d-text" x="665" y="70" text-anchor="middle">Apple servers</text><text class="d-sub" x="665" y="92" text-anchor="middle">store locked boxes</text></g>
+              <g class="d-node accent" style="--i:6"><rect x="300" y="200" width="170" height="70" rx="10"/><text class="d-text" x="385" y="230" text-anchor="middle">Your phone</text><text class="d-sub" x="385" y="252" text-anchor="middle">holds the private key</text></g>
+              <path class="d-edge" style="--i:1" d="M170 75 L300 75"/>
+              <path class="d-arrow" style="--i:1" d="M300 75 L290 70 L290 80 Z"/>
+              <path class="d-edge" style="--i:3" d="M470 75 L590 75"/>
+              <path class="d-arrow" style="--i:3" d="M590 75 L580 70 L580 80 Z"/>
+              <path class="d-edge accent" style="--i:5" d="M665 110 L665 235 L470 235"/>
+              <path class="d-arrow" style="--i:5" d="M470 235 L480 230 L480 240 Z"/>
+              <text class="d-label" style="--i:7" x="235" y="60" text-anchor="middle">Bluetooth</text>
+              <text class="d-label" style="--i:7" x="530" y="62" text-anchor="middle">upload</text>
+              <text class="d-label" style="--i:7" x="570" y="190" text-anchor="middle">download, then unlock</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 75 L300 75 L470 75 L590 75"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The location is locked on the stranger's phone, so Apple only ever stores and forwards something it can't read.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Two constraints forced this. First, the tag must be cheap and run for about a year on a small battery, so it can't carry a GPS chip or a cellular radio. Second, a tag that shouts the same identifier forever would let anyone follow a person around. So the shouted key changes regularly, a trick called <dfn class="term" title="Switching to a fresh key on a schedule so messages can't be linked to one sender.">key rotation</dfn>. Your phone and the tag both know how to compute the same sequence of keys, so you can still look up all of them, but an eavesdropper sees what looks like unrelated devices.</p>
+          <p>The price is a loose spot in the design: the system only works where there are many Apple devices. It is a <dfn class="term" title="A network built from ordinary users' devices helping each other.">crowd-sourced network</dfn>, so a tag in a city centre updates within minutes, while one on a remote road might not update for days. Privacy also cuts both ways: the same anonymity that protects you made unwanted tracking possible, which is why iPhones now warn you if an unknown tag keeps travelling with you.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">The network never learns where anything is; it only carries sealed envelopes.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>The overall scheme (broadcast key, finder encrypts, owner decrypts) is well documented by Apple and by academic researchers who studied the protocol. I'm less sure of exact details such as how often keys rotate in each mode or what precise cryptography is used, so I've left those out on purpose.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Your tag can show up on a map without any internet of its own.</strong> It borrows a stranger's phone for both location and connection.</li>
+            <li><strong>Updates are fast in a busy city and slow in the countryside.</strong> The system needs a passing device to hear the tag at all.</li>
+            <li><strong>Apple can't tell the police where your tag is.</strong> It only holds encrypted reports and doesn't have the private key.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Apple's Platform Security guide and Find My network accessory specification, and the research paper "Who Can Find My Devices?" (Heinrich et al., 2021). Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-05-stripe-idempotency" data-topic="Stripe idempotency keys" data-domain="Infra" data-date="2026-11-05">
       <header class="entry-head">
         <div class="entry-meta">
