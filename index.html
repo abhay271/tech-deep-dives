@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-07-email-spf-dkim-dmarc"><time datetime="2026-11-07">2026-11-07</time><span>Email: how a 1980s protocol with no passwords still spots fake mail</span></a></li>
         <li><a href="#2026-11-06-find-my-airtag"><time datetime="2026-11-06">2026-11-06</time><span>Apple Find My: how a keyring with no internet shows up on a map</span></a></li>
         <li><a href="#2026-11-05-stripe-idempotency"><time datetime="2026-11-05">2026-11-05</time><span>Stripe's idempotency keys: how a payment API survives a dropped connection</span></a></li>
         <li><a href="#2026-11-04-clickhouse"><time datetime="2026-11-04">2026-11-04</time><span>ClickHouse: why analytics databases store tables sideways</span></a></li>
@@ -278,6 +279,85 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-07-email-spf-dkim-dmarc" data-topic="Email delivery: SMTP, SPF, DKIM and DMARC" data-domain="Protocols" data-date="2026-11-07">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-11-07">07 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Email: how a 1980s protocol with no passwords still tells real mail from fake</h2>
+        <p class="lede">You send a message and it lands in a friend's inbox on a different company's servers. Nobody in the middle checks who you are. The design challenge: email was built for a small, trusting network, so how do we stop anyone from typing "From: your-bank.com" on a message?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>SMTP</dt><dd>The "Simple Mail Transfer Protocol": the plain-text conversation one mail server has with another to hand over a message.</dd></div>
+            <div><dt>DNS record</dt><dd>A small public note attached to a domain name, such as "mail for this domain goes to that server". Anyone can look it up.</dd></div>
+            <div><dt>SPF</dt><dd>A DNS record where a domain lists which servers are allowed to send mail for it.</dd></div>
+            <div><dt>Digital signature</dt><dd>A stamp made with a secret key that anyone holding the matching public key can check. It proves who made it and that the content has not changed.</dd></div>
+            <div><dt>DKIM</dt><dd>A scheme where the sending server signs each message and publishes the public key in DNS.</dd></div>
+            <div><dt>DMARC</dt><dd>A DNS record where a domain says what receivers should do with mail that fails the SPF and DKIM checks.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>When you hit send, your mail provider looks up the recipient's domain in <dfn class="term" title="A small public note attached to a domain name. Anyone can look it up.">DNS</dfn> to find which server accepts its mail. Then the two servers talk over <dfn class="term" title="Simple Mail Transfer Protocol: the plain-text conversation servers use to pass a message along.">SMTP</dfn>: "I have a message from alice@a.com for bob@b.com", then the message itself. That is the whole trick.</p>
+          <p>Here is the problem. In that conversation the sender simply <em>says</em> who they are. The visible "From" line is just text the sender typed. Nothing in SMTP checks it.</p>
+          <p>The fix was added decades later, on top, using DNS as a public noticeboard. Three checks work together. <dfn class="term" title="Sender Policy Framework: a DNS record listing which servers may send mail for a domain.">SPF</dfn>: the receiver asks, "Is the server delivering this one of the servers a.com says may send for it?" <dfn class="term" title="DomainKeys Identified Mail: the sending server signs each message, and the public key lives in DNS.">DKIM</dfn>: the sending server adds a <dfn class="term" title="A stamp made with a secret key that anyone with the public key can check. It proves who made it and that the content was not changed.">digital signature</dfn> to each message, and the receiver fetches a.com's public key from DNS to check it. <dfn class="term" title="Domain-based Message Authentication, Reporting and Conformance: a DNS record saying what to do with mail that fails the checks.">DMARC</dfn>: a.com publishes a rule, such as "if neither check passes for the From address people see, reject it".</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a sending server signs and sends a message, the receiving server checks DNS for the sender's rules. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-07-email-spf-dkim-dmarc-d1-t 2026-11-07-email-spf-dkim-dmarc-d1-d">
+              <title id="2026-11-07-email-spf-dkim-dmarc-d1-t">The receiving server checks the sender's rules in DNS</title>
+              <desc id="2026-11-07-email-spf-dkim-dmarc-d1-d">A sending mail server signs a message and sends it over SMTP to a receiving mail server. The receiving server looks up the sender's domain in DNS to get the list of allowed servers, the public key, and the policy, then decides whether to deliver, send to spam, or reject.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="40" width="170" height="70" rx="10"/><text class="d-text" x="105" y="70" text-anchor="middle">Sending server</text><text class="d-sub" x="105" y="92" text-anchor="middle">signs the message</text></g>
+              <g class="d-node alt" style="--i:2"><rect x="570" y="40" width="170" height="70" rx="10"/><text class="d-text" x="655" y="70" text-anchor="middle">Receiving server</text><text class="d-sub" x="655" y="92" text-anchor="middle">runs the checks</text></g>
+              <g class="d-node" style="--i:4"><rect x="295" y="200" width="170" height="70" rx="10"/><text class="d-text" x="380" y="230" text-anchor="middle">DNS for a.com</text><text class="d-sub" x="380" y="252" text-anchor="middle">servers, key, policy</text></g>
+              <g class="d-node accent" style="--i:6"><rect x="570" y="200" width="170" height="70" rx="10"/><text class="d-text" x="655" y="230" text-anchor="middle">Inbox / spam / reject</text><text class="d-sub" x="655" y="252" text-anchor="middle">the verdict</text></g>
+              <path class="d-edge" style="--i:1" d="M190 75 L570 75"/>
+              <path class="d-arrow" style="--i:1" d="M570 75 L560 70 L560 80 Z"/>
+              <path class="d-edge" style="--i:3" d="M600 110 L600 150 L380 150 L380 200"/>
+              <path class="d-arrow" style="--i:3" d="M380 200 L375 190 L385 190 Z"/>
+              <path class="d-edge accent" style="--i:5" d="M655 110 L655 200"/>
+              <path class="d-arrow" style="--i:5" d="M655 200 L650 190 L660 190 Z"/>
+              <text class="d-label" style="--i:7" x="380" y="62" text-anchor="middle">SMTP</text>
+              <text class="d-label" style="--i:7" x="490" y="140" text-anchor="middle">"what are a.com's rules?"</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M190 75 L570 75"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The message carries a claim and a signature. The proof comes from DNS, which only the real domain owner can edit.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Email has to work between any two servers in the world, run by strangers, with no central company in charge. So you can't bolt on a single login system. And you can't change SMTP itself, because millions of old servers would stop talking to the rest. The only place everyone already trusts, and where only the domain owner can post, is DNS. So the new checks hide in DNS records and in extra message headers that old servers happily pass along.</p>
+          <p>The trade-off is that the checks are fragile. SPF looks at the delivering server, so a message forwarded through another server can fail it. DKIM survives forwarding but breaks if anything edits the message, which mailing lists often do. That is why DMARC passes mail if <em>either</em> check succeeds, and why many domains start with a "just report, don't reject" policy.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Email never learned to prove who you are. It learned to let a domain say who may speak for it.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>The roles of SPF, DKIM and DMARC are standard and well documented. I've left out the exact record syntax, how the checks compare domains ("alignment"), and how large providers weigh these checks against other spam signals, since those details vary and I didn't re-verify them in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Spoofed "From" addresses used to be trivial.</strong> The protocol never checked them. Only the add-on checks changed that.</li>
+            <li><strong>Mail from a new tool you set up lands in spam until you add DNS records.</strong> Receivers are looking for the domain's own approval of that sender.</li>
+            <li><strong>A forwarded or mailing-list message sometimes gets flagged.</strong> Forwarding changes the delivering server, and editing changes the signed content.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the SMTP (RFC 5321), SPF (RFC 7208), DKIM (RFC 6376) and DMARC (RFC 7489) specifications. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-06-find-my-airtag" data-topic="Apple Find My and AirTag" data-domain="Consumer apps" data-date="2026-11-06">
       <header class="entry-head">
         <div class="entry-meta">
