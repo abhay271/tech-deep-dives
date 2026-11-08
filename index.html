@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-08-v8-javascript-engine"><time datetime="2026-11-08">2026-11-08</time><span>V8: how Chrome runs JavaScript fast when it never says what anything is</span></a></li>
         <li><a href="#2026-11-07-email-spf-dkim-dmarc"><time datetime="2026-11-07">2026-11-07</time><span>Email: how a 1980s protocol with no passwords still spots fake mail</span></a></li>
         <li><a href="#2026-11-06-find-my-airtag"><time datetime="2026-11-06">2026-11-06</time><span>Apple Find My: how a keyring with no internet shows up on a map</span></a></li>
         <li><a href="#2026-11-05-stripe-idempotency"><time datetime="2026-11-05">2026-11-05</time><span>Stripe's idempotency keys: how a payment API survives a dropped connection</span></a></li>
@@ -279,6 +280,84 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-08-v8-javascript-engine" data-topic="V8 JavaScript engine" data-domain="OS/runtime internals" data-date="2026-11-08">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">OS/runtime internals</span>
+          <time datetime="2026-11-08">08 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">V8: how Chrome runs JavaScript fast when JavaScript refuses to say what anything is</h2>
+        <p class="lede">A web page hands Chrome some JavaScript and expects it to run instantly. But JavaScript never declares types: a variable can be a number now and a string a moment later. The design challenge: how do you make code run at near-native speed when you can't know what the data looks like?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Interpreter</dt><dd>A program that reads code one small step at a time and does each step right away. It starts instantly but runs slowly.</dd></div>
+            <div><dt>Compiler</dt><dd>A program that translates code into the machine's own instructions ahead of running it. Slower to start, much faster to run.</dd></div>
+            <div><dt>JIT (just-in-time) compiling</dt><dd>Compiling while the program is already running, and only for the parts that turn out to be used a lot.</dd></div>
+            <div><dt>Hidden class</dt><dd>V8's secret label for "objects with exactly these properties, added in this order". Objects with the same label can be handled the same way.</dd></div>
+            <div><dt>Speculation</dt><dd>Compiling on a bet: "so far this was always a number, so assume it stays one."</dd></div>
+            <div><dt>Deoptimization</dt><dd>Throwing away the fast, bet-based machine code and going back to the slow-but-safe version when the bet turns out wrong.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Take a tiny function: <code>function area(p) { return p.x * p.y; }</code>. In a language like C, the computer knows exactly where <code>x</code> sits inside <code>p</code>, so reading it is one cheap step. In JavaScript, <code>p</code> could be anything, so a naive engine has to search for the name "x" every single time.</p>
+          <p>V8, the engine inside Chrome and Node.js, solves this by running your code in stages. First an <dfn class="term" title="Reads code a step at a time. Starts instantly, runs slowly.">interpreter</dfn> runs it right away, so the page doesn't wait. While it runs, V8 quietly watches. It notices that every <code>p</code> passed to <code>area</code> so far had the same shape: the same properties, created in the same order. V8 gives each shape a <dfn class="term" title="An internal label for 'objects with exactly these properties in this order'.">hidden class</dfn>, so "has x and y" becomes one quick label check instead of a name search.</p>
+          <p>When a function gets called a lot, V8 hands it to an optimizing <dfn class="term" title="Translates code into the machine's own instructions.">compiler</dfn> (this is <dfn class="term" title="Just-in-time compiling: compiling while the program runs, only the parts that are used a lot.">JIT</dfn> compiling). The compiler uses what V8 observed and makes a <dfn class="term" title="Compiling on a bet that what you saw so far will keep being true.">speculative</dfn> bet: "<code>p</code> always has this shape, and x and y are numbers." The result is tight machine code with just a quick guard at the top: "is this still the shape I expected?"</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: JavaScript starts in the interpreter, hot code is compiled to fast machine code, and a surprise sends it back to the interpreter. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-08-v8-javascript-engine-d1-t 2026-11-08-v8-javascript-engine-d1-d">
+              <title id="2026-11-08-v8-javascript-engine-d1-t">Code moves up to fast machine code and falls back on a surprise</title>
+              <desc id="2026-11-08-v8-javascript-engine-d1-d">JavaScript source goes to an interpreter that also records what kinds of values it sees. Hot functions are compiled to fast machine code based on those observations. If the fast code meets a value it did not expect, it bails out and execution returns to the interpreter.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="40" width="150" height="70" rx="10"/><text class="d-text" x="95" y="70" text-anchor="middle">Your JavaScript</text><text class="d-sub" x="95" y="92" text-anchor="middle">no types written</text></g>
+              <g class="d-node alt" style="--i:2"><rect x="300" y="40" width="170" height="70" rx="10"/><text class="d-text" x="385" y="70" text-anchor="middle">Interpreter</text><text class="d-sub" x="385" y="92" text-anchor="middle">runs now, takes notes</text></g>
+              <g class="d-node accent" style="--i:4"><rect x="590" y="40" width="150" height="70" rx="10"/><text class="d-text" x="665" y="70" text-anchor="middle">Fast machine code</text><text class="d-sub" x="665" y="92" text-anchor="middle">built on a bet</text></g>
+              <path class="d-edge" style="--i:1" d="M170 75 L300 75"/>
+              <path class="d-arrow" style="--i:1" d="M300 75 L290 70 L290 80 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M470 75 L590 75"/>
+              <path class="d-arrow" style="--i:3" d="M590 75 L580 70 L580 80 Z"/>
+              <path class="d-edge" style="--i:5" d="M665 110 L665 200 L385 200 L385 110"/>
+              <path class="d-arrow" style="--i:5" d="M385 110 L380 120 L390 120 Z"/>
+              <text class="d-label" style="--i:6" x="530" y="62" text-anchor="middle">gets hot</text>
+              <text class="d-label" style="--i:6" x="525" y="228" text-anchor="middle">surprise: the bet was wrong, fall back</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 75 L300 75 L470 75 L590 75"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>V8 doesn't pick one mode. It starts slow, learns from real use, speeds up the hot parts, and retreats when it is proven wrong.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The engine can't just compile everything up front. Compiling well is slow, and a web page needs to start in a blink. Most of the code on a page also runs once or never. So V8 spends effort only where the evidence says it pays off.</p>
+          <p>And it can't skip the bet, because without knowing the types, the compiled code would be barely faster than the interpreter. The price is the escape hatch. If <code>area</code> is suddenly called with a differently shaped object, the guard fails and V8 performs <dfn class="term" title="Throwing away the fast code and returning to the safe slow version when a bet fails.">deoptimization</dfn>: it drops the fast version and resumes in the interpreter, then may try again later with a looser bet. Correctness never depends on the guess being right; only speed does.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">V8 makes JavaScript fast by guessing, checking the guess on every call, and keeping a safe way out.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the overall shape: an interpreter, hidden classes, and optimizing compilation that speculates and can deoptimize. V8 has added extra middle tiers over the years and keeps changing which tiers exist and when code moves between them, so I've deliberately left out tier names and the exact thresholds. I didn't re-check the current setup in this run.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A page's JavaScript feels slow for the first moments, then speeds up.</strong> It starts in the interpreter and only gets compiled once V8 has seen it is hot.</li>
+            <li><strong>Performance advice says to build objects the same way every time.</strong> Same properties in the same order means the same hidden class, so the guard keeps passing.</li>
+            <li><strong>Mixing types in one function can make it slower.</strong> A function that sometimes gets numbers and sometimes strings can't be compiled on a firm bet, or keeps falling back after a failed one.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: V8's public engineering blog (v8.dev) on its interpreter, hidden classes and optimizing compilers. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-07-email-spf-dkim-dmarc" data-topic="Email delivery: SMTP, SPF, DKIM and DMARC" data-domain="Protocols" data-date="2026-11-07">
       <header class="entry-head">
         <div class="entry-meta">
