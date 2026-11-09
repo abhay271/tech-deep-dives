@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-09-google-spanner-truetime"><time datetime="2026-11-09">2026-11-09</time><span>Spanner: the database that waits a few milliseconds so the planet agrees on time</span></a></li>
         <li><a href="#2026-11-08-v8-javascript-engine"><time datetime="2026-11-08">2026-11-08</time><span>V8: how Chrome runs JavaScript fast when it never says what anything is</span></a></li>
         <li><a href="#2026-11-07-email-spf-dkim-dmarc"><time datetime="2026-11-07">2026-11-07</time><span>Email: how a 1980s protocol with no passwords still spots fake mail</span></a></li>
         <li><a href="#2026-11-06-find-my-airtag"><time datetime="2026-11-06">2026-11-06</time><span>Apple Find My: how a keyring with no internet shows up on a map</span></a></li>
@@ -280,6 +281,87 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-09-google-spanner-truetime" data-topic="Google Spanner and TrueTime" data-domain="Databases" data-date="2026-11-09">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-11-09">09 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Spanner: the database that waits a few milliseconds so the whole planet agrees what time it is</h2>
+        <p class="lede">Google runs services like Ads and Photos on one database that spans continents. You can write in Tokyo and read in Iowa and never see stale data. The design challenge: computers in different places disagree about the time, and "which write happened first?" is exactly the question a database must answer.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Replica</dt><dd>One copy of a piece of data. Keeping several copies in different buildings means one failure loses nothing.</dd></div>
+            <div><dt>Paxos</dt><dd>A voting method for a group of copies to agree on each change. A change counts once a majority has accepted it.</dd></div>
+            <div><dt>Transaction</dt><dd>A group of changes that must happen all together or not at all, like moving money between two accounts.</dd></div>
+            <div><dt>Timestamp</dt><dd>A number saying when something happened. The database uses it to put all changes in one agreed order.</dd></div>
+            <div><dt>TrueTime</dt><dd>Google's clock service. Instead of one time, it answers with a range: "right now is somewhere between these two moments."</dd></div>
+            <div><dt>Commit wait</dt><dd>A deliberate pause before a write is announced as done, long enough that its timestamp is certainly in the past everywhere.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine you pay a friend in an app, then they immediately open their balance on another continent. They must see your payment. That sounds obvious, but it is hard when the two requests land on different servers in different countries.</p>
+          <p>Spanner splits a huge table into many small pieces. Each piece is kept as several <dfn class="term" title="One copy of a piece of data, kept in another building or region.">replicas</dfn> in different places, and the copies agree on every change using <dfn class="term" title="A voting method: a change counts once a majority of the copies accept it.">Paxos</dfn>. One replica acts as the leader for its piece. That handles survival of failures. It does not yet handle ordering.</p>
+          <p>For ordering, every <dfn class="term" title="A group of changes that all happen or none do.">transaction</dfn> gets a <dfn class="term" title="A number saying when something happened, used to order all changes.">timestamp</dfn>, and everyone agrees that transactions are ordered by it. The trouble is that ordinary server clocks drift apart, so two machines can easily pick timestamps in the wrong order. Spanner's answer is <dfn class="term" title="Google's clock service. It returns a range of possible times, not one time.">TrueTime</dfn>: Google's data centers have GPS receivers and atomic clocks, and the API doesn't say "it is 10:00:00". It says "it is between 10:00:00.000 and 10:00:00.004". It admits how unsure it is.</p>
+          <p>The leader picks a timestamp for the commit, then does the key trick: it waits until the whole uncertainty range has passed before telling anyone the write is done. This pause is called <dfn class="term" title="Waiting out the clock's uncertainty so the commit's timestamp is surely in the past everywhere.">commit wait</dfn>.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a write goes to a leader, is copied to replicas by vote, waits out clock uncertainty, then is reported done. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-09-google-spanner-truetime-d1-t 2026-11-09-google-spanner-truetime-d1-d">
+              <title id="2026-11-09-google-spanner-truetime-d1-t">Life of a Spanner write</title>
+              <desc id="2026-11-09-google-spanner-truetime-d1-d">A client sends a write to the leader replica. The leader picks a timestamp using TrueTime and gets a majority of replicas to accept the change. It then waits out the clock uncertainty and finally tells the client the write is done.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="40" width="130" height="70" rx="10"/><text class="d-text" x="85" y="70" text-anchor="middle">Client</text><text class="d-sub" x="85" y="92" text-anchor="middle">sends a write</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="290" y="40" width="170" height="70" rx="10"/><text class="d-text" x="375" y="70" text-anchor="middle">Leader replica</text><text class="d-sub" x="375" y="92" text-anchor="middle">picks a timestamp</text></g>
+              <g class="d-node alt" style="--i:4"><rect x="590" y="40" width="150" height="70" rx="10"/><text class="d-text" x="665" y="70" text-anchor="middle">Other replicas</text><text class="d-sub" x="665" y="92" text-anchor="middle">vote to accept</text></g>
+              <g class="d-node" style="--i:6"><rect x="290" y="190" width="170" height="70" rx="10"/><text class="d-text" x="375" y="220" text-anchor="middle">Commit wait</text><text class="d-sub" x="375" y="242" text-anchor="middle">outlast clock doubt</text></g>
+              <path class="d-edge" style="--i:1" d="M150 75 L290 75"/>
+              <path class="d-arrow" style="--i:1" d="M290 75 L280 70 L280 80 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M460 75 L590 75"/>
+              <path class="d-arrow" style="--i:3" d="M590 75 L580 70 L580 80 Z"/>
+              <path class="d-edge" style="--i:5" d="M375 110 L375 190"/>
+              <path class="d-arrow" style="--i:5" d="M375 190 L370 180 L380 180 Z"/>
+              <path class="d-edge" style="--i:7" d="M290 225 L85 225 L85 110"/>
+              <path class="d-arrow" style="--i:7" d="M85 110 L80 120 L90 120 Z"/>
+              <text class="d-label" style="--i:8" x="190" y="212" text-anchor="middle">"done"</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M150 75 L290 75 L375 75 L375 225 L85 225 L85 110"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The client only hears "done" after a vote and a short, deliberate wait.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The wait is what makes the ordering safe. Once a write is reported done, any later request anywhere will be given a timestamp that is certainly later, so it will see that write. Spanner's paper calls this property external consistency: the database's order matches the real-world order people observe.</p>
+          <p>The alternative is to skip the wait and risk anomalies, or to coordinate every transaction with a central clock server, which is slow across oceans. Google instead spent money on better clocks to make the uncertainty small, because that uncertainty is exactly the length of the pause. Better clocks directly mean faster writes.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Spanner doesn't pretend clocks agree. It measures how wrong they might be and waits that long.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the design as described in Google's 2012 Spanner paper: Paxos-replicated pieces, TrueTime intervals and commit wait. The paper reports uncertainty of only a few milliseconds, but I haven't re-checked current figures, and Google's cloud version of Spanner has evolved since, so treat any exact timing as approximate. Read-only queries use timestamps too and can often skip the wait; I've left those details out.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Writes to a global database feel slightly slower than reads.</strong> A write needs a vote across replicas plus the commit wait; reads can often be answered from a nearby copy using timestamps.</li>
+            <li><strong>Google data centers famously contain atomic clocks.</strong> Smaller clock doubt means a shorter pause on every write.</li>
+            <li><strong>A bank-style database can span regions without showing stale balances.</strong> Ordering by trusted timestamps means a later reader can never get an earlier picture.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Google's "Spanner: Google's Globally-Distributed Database" paper (OSDI 2012). Not re-checked live in this run; written from the paper as I know it.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-08-v8-javascript-engine" data-topic="V8 JavaScript engine" data-domain="OS/runtime internals" data-date="2026-11-08">
       <header class="entry-head">
         <div class="entry-meta">
