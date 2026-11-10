@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-10-terraform-plan-apply"><time datetime="2026-11-10">2026-11-10</time><span>Terraform: how a text file describes a data center and the tool makes it so</span></a></li>
         <li><a href="#2026-11-09-google-spanner-truetime"><time datetime="2026-11-09">2026-11-09</time><span>Spanner: the database that waits a few milliseconds so the planet agrees on time</span></a></li>
         <li><a href="#2026-11-08-v8-javascript-engine"><time datetime="2026-11-08">2026-11-08</time><span>V8: how Chrome runs JavaScript fast when it never says what anything is</span></a></li>
         <li><a href="#2026-11-07-email-spf-dkim-dmarc"><time datetime="2026-11-07">2026-11-07</time><span>Email: how a 1980s protocol with no passwords still spots fake mail</span></a></li>
@@ -281,6 +282,88 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-10-terraform-plan-apply" data-topic="Terraform plan and state" data-domain="Dev tools" data-date="2026-11-10">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Dev tools</span>
+          <time datetime="2026-11-10">10 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Terraform: how you describe a data center in a text file and get exactly that</h2>
+        <p class="lede">Teams use Terraform to create servers, databases and networks on AWS, Google Cloud and others by writing a text file instead of clicking through a console. The design challenge: the file says what you want, but the cloud already contains things. How does the tool figure out what to create, change or delete, without breaking what already works?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Declarative</dt><dd>You describe the end result you want ("three servers") rather than the steps to get there. The tool works out the steps.</dd></div>
+            <div><dt>Resource</dt><dd>One thing Terraform manages, such as a server, a database or a DNS entry.</dd></div>
+            <div><dt>State file</dt><dd>Terraform's own record of what it created and the details of each thing, such as the ID the cloud gave it.</dd></div>
+            <div><dt>Plan</dt><dd>A preview listing exactly what Terraform would add, change or destroy, before it does any of it.</dd></div>
+            <div><dt>Provider</dt><dd>A plugin that knows how to talk to one service's API, such as AWS. Terraform itself knows nothing about AWS.</dd></div>
+            <div><dt>Drift</dt><dd>When the real world no longer matches what was recorded, usually because someone changed it by hand.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say your file says you want two servers and a database. Run Terraform today and it creates them. Edit the file tomorrow to say three servers, run it again, and it creates only one more. It does not make three new ones. That behaviour is the whole point, and it needs the tool to remember things.</p>
+          <p>Terraform is <dfn class="term" title="You describe the result you want, not the steps. The tool works out the steps.">declarative</dfn>. It keeps a <dfn class="term" title="Terraform's own record of what it created, including the IDs the cloud assigned.">state file</dfn>: a record of every <dfn class="term" title="One thing Terraform manages, like a server, a database or a DNS entry.">resource</dfn> it made and its real cloud ID. Each run does three steps. It compares your file against that record. It refreshes the record by asking the cloud what is really there. Then it writes a <dfn class="term" title="A preview of exactly what would be added, changed or destroyed.">plan</dfn>, a list of differences, which you read and approve before anything happens.</p>
+          <p>Terraform also builds a dependency graph from your file. If a server refers to a network, the network must exist first. Things that don't depend on each other are created at the same time. Terraform doesn't know how to call any cloud itself. A <dfn class="term" title="A plugin that knows how to talk to one service's API, like AWS.">provider</dfn> plugin, a separate program Terraform starts and talks to, does the actual API calls.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: your files and the state file feed a plan, which you approve, and then a provider makes the changes in the cloud. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-10-terraform-plan-apply-d1-t 2026-11-10-terraform-plan-apply-d1-d">
+              <title id="2026-11-10-terraform-plan-apply-d1-t">From your file to a changed cloud</title>
+              <desc id="2026-11-10-terraform-plan-apply-d1-d">Your configuration file and the state file are compared to produce a plan. After approval, Terraform applies it by asking a provider plugin to call the cloud's API, and the state file is updated with the result.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="40" width="150" height="70" rx="10"/><text class="d-text" x="95" y="70" text-anchor="middle">Your .tf file</text><text class="d-sub" x="95" y="92" text-anchor="middle">what you want</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="300" y="40" width="170" height="70" rx="10"/><text class="d-text" x="385" y="70" text-anchor="middle">Plan</text><text class="d-sub" x="385" y="92" text-anchor="middle">the list of differences</text></g>
+              <g class="d-node alt" style="--i:4"><rect x="590" y="40" width="150" height="70" rx="10"/><text class="d-text" x="665" y="70" text-anchor="middle">Provider</text><text class="d-sub" x="665" y="92" text-anchor="middle">calls the cloud</text></g>
+              <g class="d-node" style="--i:6"><rect x="20" y="200" width="150" height="70" rx="10"/><text class="d-text" x="95" y="230" text-anchor="middle">State file</text><text class="d-sub" x="95" y="252" text-anchor="middle">what exists now</text></g>
+              <g class="d-node" style="--i:8"><rect x="590" y="200" width="150" height="70" rx="10"/><text class="d-text" x="665" y="230" text-anchor="middle">Cloud</text><text class="d-sub" x="665" y="252" text-anchor="middle">real servers</text></g>
+              <path class="d-edge" style="--i:1" d="M170 75 L300 75"/>
+              <path class="d-arrow" style="--i:1" d="M300 75 L290 70 L290 80 Z"/>
+              <path class="d-edge" style="--i:3" d="M95 200 L95 150 L340 150 L340 110"/>
+              <path class="d-arrow" style="--i:3" d="M340 110 L335 120 L345 120 Z"/>
+              <path class="d-edge accent" style="--i:5" d="M470 75 L590 75"/>
+              <path class="d-arrow" style="--i:5" d="M590 75 L580 70 L580 80 Z"/>
+              <path class="d-edge" style="--i:7" d="M665 110 L665 200"/>
+              <path class="d-arrow" style="--i:7" d="M665 200 L660 190 L670 190 Z"/>
+              <text class="d-label" style="--i:9" x="530" y="62" text-anchor="middle">you approve</text>
+              <text class="d-label" style="--i:9" x="230" y="170" text-anchor="middle">compare</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 75 L300 75 L470 75 L590 75 L665 75 L665 200"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Nothing changes until the plan is shown to you and approved. Afterwards the state file is updated to match.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>A cloud has no "make this match my file" button. Its API only offers small commands: create this, change that, delete the other. And the cloud's answer to "what do I have?" is often not enough to tell which things belong to your project. So Terraform keeps its own list of what it made. Without it, a renamed server would look like "new server, create it", and the old one would be left running forever, costing money.</p>
+          <p>The cost of that design is that the state file becomes precious. It can contain sensitive values, so it needs protecting. Teams usually keep it in shared remote storage with <em>locking</em>, so two people running Terraform at once can't corrupt it. If the file is lost, Terraform forgets what it owns.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Terraform isn't a script of commands. It is a diff between what you wrote, what it remembers, and what really exists.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the plan, state, dependency graph and provider-plugin model, which are documented by HashiCorp. I've left out details I didn't re-verify, such as the exact default number of parallel operations, how providers are wired up over RPC, and newer features. OpenTofu, a community fork, works along the same lines.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Someone edits a server by hand in the console, and the next Terraform run wants to undo it.</strong> That's drift: the refresh sees reality differ from your file, so the plan includes a fix.</li>
+            <li><strong>Renaming a resource in the file can make Terraform destroy and recreate it.</strong> It matches things by their name in the file, so a new name looks like a brand-new thing.</li>
+            <li><strong>Teams argue about where the state file lives.</strong> It is the only memory of what exists, so it needs sharing, locking and protection.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: HashiCorp's Terraform documentation on state, plan/apply and the resource graph. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-09-google-spanner-truetime" data-topic="Google Spanner and TrueTime" data-domain="Databases" data-date="2026-11-09">
       <header class="entry-head">
         <div class="entry-meta">
