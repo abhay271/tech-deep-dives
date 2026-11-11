@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-11-dropbox-sync"><time datetime="2026-11-11">2026-11-11</time><span>Dropbox: how fixing a typo in a huge file doesn't re-upload it</span></a></li>
         <li><a href="#2026-11-10-terraform-plan-apply"><time datetime="2026-11-10">2026-11-10</time><span>Terraform: how a text file describes a data center and the tool makes it so</span></a></li>
         <li><a href="#2026-11-09-google-spanner-truetime"><time datetime="2026-11-09">2026-11-09</time><span>Spanner: the database that waits a few milliseconds so the planet agrees on time</span></a></li>
         <li><a href="#2026-11-08-v8-javascript-engine"><time datetime="2026-11-08">2026-11-08</time><span>V8: how Chrome runs JavaScript fast when it never says what anything is</span></a></li>
@@ -282,6 +283,84 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-11-dropbox-sync" data-topic="Dropbox file sync" data-domain="Consumer apps" data-date="2026-11-11">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-11-11">11 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Dropbox: how fixing one typo in a 2 GB file doesn't re-upload 2 GB</h2>
+        <p class="lede">Dropbox keeps a folder identical on your laptop, your phone and the web. The design challenge: files are big, networks are slow, and you edit constantly. Sending the whole file every time you press save would be painfully wasteful, so how does it send only what changed?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Block</dt><dd>A fixed-size slice of a file. Dropbox treats a file as a list of blocks rather than one lump.</dd></div>
+            <div><dt>Hash</dt><dd>A short fingerprint computed from some data. The same data always gives the same fingerprint, and different data almost never does.</dd></div>
+            <div><dt>Deduplication</dt><dd>Storing identical data only once, even if many files or many people have it.</dd></div>
+            <div><dt>Metadata</dt><dd>Information about a file (its name, folder, and list of blocks) as opposed to the file's actual contents.</dd></div>
+            <div><dt>Sync engine</dt><dd>The program on your computer that watches for changes and works out what to upload or download.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine a long slide deck. You fix one typo on slide 40 and press save. Dropbox should not upload the whole deck again. It should upload just the part that changed.</p>
+          <p>To make that possible, Dropbox never thinks of a file as one thing. It cuts every file into <dfn class="term" title="A fixed-size slice of a file, a few megabytes at most.">blocks</dfn> and computes a <dfn class="term" title="A short fingerprint of some data. Same data, same fingerprint.">hash</dfn> of each one. A file is then just a list: "block A, block B, block C". When you edit the file, the sync engine cuts it again and compares the new hashes with the old list. Only the blocks whose fingerprint changed get uploaded.</p>
+          <p>The system is split in two on purpose. The <dfn class="term" title="Information about a file, like its name and its list of blocks, not the contents.">metadata</dfn> (names, folders, which blocks make up each file version) lives in one place and is small and fast to update. The block contents live in a separate huge store. A save becomes: upload the new blocks, then update the metadata so the file's list points to them. Your other devices see the metadata change, work out which blocks they are missing, and download only those.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: an edited file is cut into blocks, only the changed block is uploaded, the metadata list is updated, and another device downloads just that block. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-11-dropbox-sync-d1-t 2026-11-11-dropbox-sync-d1-d">
+              <title id="2026-11-11-dropbox-sync-d1-t">Saving one change and syncing it</title>
+              <desc id="2026-11-11-dropbox-sync-d1-d">Your laptop cuts an edited file into blocks and finds that one block changed. It uploads that block to the block store and updates the file's block list in the metadata service. A second device sees the new list and downloads only the new block.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="40" width="150" height="70" rx="10"/><text class="d-text" x="95" y="70" text-anchor="middle">Your laptop</text><text class="d-sub" x="95" y="92" text-anchor="middle">finds changed block</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="300" y="40" width="170" height="70" rx="10"/><text class="d-text" x="385" y="70" text-anchor="middle">Block store</text><text class="d-sub" x="385" y="92" text-anchor="middle">file contents</text></g>
+              <g class="d-node alt" style="--i:4"><rect x="300" y="200" width="170" height="70" rx="10"/><text class="d-text" x="385" y="230" text-anchor="middle">Metadata</text><text class="d-sub" x="385" y="252" text-anchor="middle">file = list of blocks</text></g>
+              <g class="d-node" style="--i:6"><rect x="590" y="200" width="150" height="70" rx="10"/><text class="d-text" x="665" y="230" text-anchor="middle">Your phone</text><text class="d-sub" x="665" y="252" text-anchor="middle">fetches new block</text></g>
+              <path class="d-edge accent" style="--i:1" d="M170 75 L300 75"/>
+              <path class="d-arrow" style="--i:1" d="M300 75 L290 70 L290 80 Z"/>
+              <path class="d-edge" style="--i:3" d="M385 110 L385 200"/>
+              <path class="d-arrow" style="--i:3" d="M385 200 L380 190 L390 190 Z"/>
+              <path class="d-edge" style="--i:5" d="M470 235 L590 235"/>
+              <path class="d-arrow" style="--i:5" d="M590 235 L580 230 L580 240 Z"/>
+              <text class="d-label" style="--i:7" x="235" y="62" text-anchor="middle">1 block</text>
+              <text class="d-label" style="--i:7" x="530" y="222" text-anchor="middle">"new list"</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 75 L385 75 L385 235 L590 235"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Only the changed block travels. The small metadata update tells every other device what to fetch.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Uploads are the slow, expensive part, so the design shrinks them. Because blocks are named by their hash, it also gets <dfn class="term" title="Storing identical data only once.">deduplication</dfn> almost for free: if a block with that fingerprint already exists, there's nothing to upload. Copy a file into another folder, or save a file someone else already has, and little or no data moves.</p>
+          <p>The cost is that every device needs a smart <dfn class="term" title="The program on your computer that watches for changes and decides what to upload or download.">sync engine</dfn> that must notice changes, hash blocks and handle races, such as two devices editing the same file while offline. Dropbox's usual answer to a conflict is to keep both, creating a "conflicted copy" rather than guessing which one you wanted.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">A synced file isn't a file in the cloud. It's a short list of block fingerprints, plus a pile of blocks.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the block-plus-hash idea and the split between metadata and block storage, which Dropbox has described publicly. I haven't re-verified the exact maximum block size (I recall it being on the order of a few megabytes), whether blocks are sliced at fixed positions or by content, or how the sync engine has been rewritten over the years, so I've kept those details out.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Saving a big file after a tiny edit syncs in seconds.</strong> Only the changed block is uploaded; the rest already exists.</li>
+            <li><strong>Moving or renaming a huge folder is nearly instant.</strong> Only the metadata (names and folders) changes. The blocks are untouched.</li>
+            <li><strong>Edit the same file on two offline devices and you get a "conflicted copy".</strong> Both versions are valid lists of blocks, and there's no safe way to merge them automatically, so both are kept.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Dropbox's engineering blog and public technical talks on block-level sync and its storage design. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-10-terraform-plan-apply" data-topic="Terraform plan and state" data-domain="Dev tools" data-date="2026-11-10">
       <header class="entry-head">
         <div class="entry-meta">
