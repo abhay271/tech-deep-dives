@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-12-bgp-internet-routing"><time datetime="2026-11-12">2026-11-12</time><span>BGP: how the internet's thousands of networks find each other on trust alone</span></a></li>
         <li><a href="#2026-11-11-dropbox-sync"><time datetime="2026-11-11">2026-11-11</time><span>Dropbox: how fixing a typo in a huge file doesn't re-upload it</span></a></li>
         <li><a href="#2026-11-10-terraform-plan-apply"><time datetime="2026-11-10">2026-11-10</time><span>Terraform: how a text file describes a data center and the tool makes it so</span></a></li>
         <li><a href="#2026-11-09-google-spanner-truetime"><time datetime="2026-11-09">2026-11-09</time><span>Spanner: the database that waits a few milliseconds so the planet agrees on time</span></a></li>
@@ -283,6 +284,85 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-12-bgp-internet-routing" data-topic="BGP internet routing" data-domain="Protocols" data-date="2026-11-12">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-11-12">12 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">BGP: how the internet's thousands of networks find each other on trust alone</h2>
+        <p class="lede">The internet is not one network. It is tens of thousands of separate networks run by ISPs, companies and universities, and your message may cross several of them. The design challenge: no one is in charge, so how does each network learn which way to send traffic for any address on Earth?</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Autonomous system (AS)</dt><dd>One network under a single owner's control, such as an ISP, a cloud company or a university. The internet is made of these joined together.</dd></div>
+            <div><dt>BGP</dt><dd>Border Gateway Protocol. The language that neighbouring networks use to tell each other which addresses they can reach.</dd></div>
+            <div><dt>Prefix</dt><dd>A block of IP addresses written as a range, such as everything that starts with the same first few numbers. Networks announce prefixes, not single addresses.</dd></div>
+            <div><dt>Route announcement</dt><dd>A BGP message saying "I can reach this prefix, and here is the chain of networks to go through."</dd></div>
+            <div><dt>Route withdrawal</dt><dd>A BGP message saying "forget what I told you earlier, I can no longer reach this prefix."</dd></div>
+            <div><dt>DNS</dt><dd>The system that turns a name like facebook.com into an IP address.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>When you open an app, your data leaves your ISP and passes through other networks you have never heard of. Each network needs a way to know where to hand it next. That is what <dfn class="term" title="Border Gateway Protocol: how neighbouring networks tell each other which addresses they can reach.">BGP</dfn> does.</p>
+          <p>Each network, called an <dfn class="term" title="One network under a single owner, like an ISP or a cloud company.">autonomous system</dfn>, announces to its neighbours the <dfn class="term" title="A block of IP addresses, announced as one range.">prefixes</dfn> it owns. Neighbours pass the news along, adding themselves to the chain. So a network ends up hearing things like "to reach this range, go through B, then C, then D." It usually has several such options and picks one, mostly based on business deals and policy, then on the shortest chain.</p>
+          <p>There is no central map. Every network builds its own picture from what its neighbours say, and updates it as announcements and <dfn class="term" title="A message saying a route no longer works.">withdrawals</dfn> arrive.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a network announces its address range, and the announcement is passed along through two networks to your ISP, which then knows the route back. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-12-bgp-internet-routing-d1-t 2026-11-12-bgp-internet-routing-d1-d">
+              <title id="2026-11-12-bgp-internet-routing-d1-t">A route announcement spreading</title>
+              <desc id="2026-11-12-bgp-internet-routing-d1-d">A website's network announces its address range. The announcement passes to a transit network, then to your ISP, each adding itself to the chain. Your traffic then flows the opposite way along that chain.</desc>
+              <g class="d-node accent" style="--i:0"><rect x="20" y="40" width="150" height="70" rx="10"/><text class="d-text" x="95" y="70" text-anchor="middle">Website's network</text><text class="d-sub" x="95" y="92" text-anchor="middle">owns the addresses</text></g>
+              <g class="d-node" style="--i:2"><rect x="300" y="40" width="170" height="70" rx="10"/><text class="d-text" x="385" y="70" text-anchor="middle">Middle network</text><text class="d-sub" x="385" y="92" text-anchor="middle">passes it on</text></g>
+              <g class="d-node" style="--i:4"><rect x="590" y="40" width="150" height="70" rx="10"/><text class="d-text" x="665" y="70" text-anchor="middle">Your ISP</text><text class="d-sub" x="665" y="92" text-anchor="middle">learns the route</text></g>
+              <g class="d-node alt" style="--i:6"><rect x="590" y="200" width="150" height="70" rx="10"/><text class="d-text" x="665" y="230" text-anchor="middle">You</text><text class="d-sub" x="665" y="252" text-anchor="middle">open the site</text></g>
+              <path class="d-edge accent" style="--i:1" d="M170 75 L300 75"/>
+              <path class="d-arrow" style="--i:1" d="M300 75 L290 70 L290 80 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M470 75 L590 75"/>
+              <path class="d-arrow" style="--i:3" d="M590 75 L580 70 L580 80 Z"/>
+              <path class="d-edge" style="--i:5" d="M665 200 L665 110"/>
+              <path class="d-arrow" style="--i:5" d="M665 110 L660 120 L670 120 Z"/>
+              <text class="d-label" style="--i:7" x="235" y="62" text-anchor="middle">"I have these"</text>
+              <text class="d-label" style="--i:7" x="530" y="62" text-anchor="middle">"via me"</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 75 L300 75 L470 75 L590 75 L665 75"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Announcements travel outward from the owner. Real traffic later follows the same chain in reverse.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The networks are owned by competitors, countries and strangers. No one could run a single central map for all of them, and no one would agree to let a competitor control it. Neighbours simply telling neighbours scales to the whole planet, and it lets each owner apply its own business rules, like preferring a cheaper link.</p>
+          <p>The cost is trust. By default, BGP believes what it is told. In 2008 a network in Pakistan announced a range belonging to YouTube, meant to block it locally, and the announcement leaked to the wider internet. Networks prefer the most specific range on offer, so much of the world sent YouTube traffic to the wrong place. Newer safeguards, such as RPKI, let owners sign proof of who may announce what, but adoption is still partial.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">The internet doesn't have a map. It has thousands of networks repeating what their neighbours told them.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the neighbour-to-neighbour announcement model, the preference for the most specific range, and the broad story of the 2008 YouTube incident and the 2021 Facebook outage. I haven't re-checked exact durations or every detail of how Facebook's internal systems reacted, so I've kept those loose. How widely RPKI is deployed changes over time, so treat "partial" as a snapshot.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Facebook, Instagram and WhatsApp vanished together in October 2021.</strong> A faulty change during maintenance led Facebook's network to withdraw its routes. With no route to its addresses, the rest of the internet could not reach it. Its <dfn class="term" title="Turns names into IP addresses.">DNS</dfn> servers also went unreachable, so even the names stopped resolving.</li>
+            <li><strong>A mistake in one country can break a site everywhere.</strong> Announcements spread to neighbours of neighbours, so one wrong announcement can travel far before anyone notices.</li>
+            <li><strong>Your traffic to a site and its reply can take different paths.</strong> Each network picks routes by its own rules, so the way there and the way back are chosen independently.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the BGP specification (RFC 4271), Cloudflare's and Facebook's public write-ups of the October 2021 outage, and RIPE's analysis of the 2008 YouTube hijack. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-11-dropbox-sync" data-topic="Dropbox file sync" data-domain="Consumer apps" data-date="2026-11-11">
       <header class="entry-head">
         <div class="entry-meta">
