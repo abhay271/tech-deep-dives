@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-13-envoy-load-balancing"><time datetime="2026-11-13">2026-11-13</time><span>Envoy: how a proxy picks one of a hundred servers by asking only two</span></a></li>
         <li><a href="#2026-11-12-bgp-internet-routing"><time datetime="2026-11-12">2026-11-12</time><span>BGP: how the internet's thousands of networks find each other on trust alone</span></a></li>
         <li><a href="#2026-11-11-dropbox-sync"><time datetime="2026-11-11">2026-11-11</time><span>Dropbox: how fixing a typo in a huge file doesn't re-upload it</span></a></li>
         <li><a href="#2026-11-10-terraform-plan-apply"><time datetime="2026-11-10">2026-11-10</time><span>Terraform: how a text file describes a data center and the tool makes it so</span></a></li>
@@ -284,6 +285,84 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-13-envoy-load-balancing" data-topic="Envoy load balancing" data-domain="Infra" data-date="2026-11-13">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-11-13">13 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Envoy: how a proxy picks one of a hundred servers by asking only two</h2>
+        <p class="lede">Big apps run the same service on many machines, and every request has to land on one of them. The design challenge: sending requests round and round blindly overloads slow machines, but checking every machine each time is too slow and too crowded.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Load balancer</dt><dd>A piece of software that receives requests and decides which server should handle each one.</dd></div>
+            <div><dt>Envoy</dt><dd>A widely used open-source proxy, started at Lyft, that sits in front of or beside services and forwards their traffic. Many large companies and service meshes use it.</dd></div>
+            <div><dt>Replica</dt><dd>One of several identical copies of a service running on different machines.</dd></div>
+            <div><dt>In-flight request</dt><dd>A request that has been sent to a server and has not been answered yet.</dd></div>
+            <div><dt>Outlier detection</dt><dd>Noticing that one replica keeps failing and temporarily removing it from the pool.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say a checkout service runs on 100 <dfn class="term" title="One of several identical copies of a service on different machines.">replicas</dfn>. A <dfn class="term" title="Software that decides which server handles each request.">load balancer</dfn> such as <dfn class="term" title="An open-source proxy that forwards traffic between services.">Envoy</dfn> must choose one for every request.</p>
+          <p>The simplest idea is to take turns: replica 1, then 2, then 3. It fails when requests are uneven. If one replica gets a few slow requests, it keeps getting new ones on schedule and falls further behind.</p>
+          <p>The next idea is to always pick the replica with the fewest <dfn class="term" title="A request sent to a server that has not been answered yet.">in-flight requests</dfn>. That is smarter, but it needs a fresh count from all 100 machines on every request. Worse, many balancers would see the same "emptiest" replica at once and all send to it together.</p>
+          <p>Envoy's default for this style, called least request, does something simpler. It picks two replicas at random, compares how busy each one is, and sends the request to the less busy of the two. This is known as the "power of two choices."</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a request arrives at Envoy, which picks two random replicas, compares their load, and sends the request to the quieter one. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-13-envoy-load-balancing-d1-t 2026-11-13-envoy-load-balancing-d1-d">
+              <title id="2026-11-13-envoy-load-balancing-d1-t">Picking the less busy of two random replicas</title>
+              <desc id="2026-11-13-envoy-load-balancing-d1-d">A request reaches Envoy. Envoy picks two replicas at random, one with 7 requests in progress and one with 2. It sends the request to the one with 2.</desc>
+              <g class="d-node alt" style="--i:0"><rect x="20" y="115" width="140" height="70" rx="10"/><text class="d-text" x="90" y="145" text-anchor="middle">Request</text><text class="d-sub" x="90" y="167" text-anchor="middle">arrives</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="250" y="115" width="160" height="70" rx="10"/><text class="d-text" x="330" y="145" text-anchor="middle">Envoy</text><text class="d-sub" x="330" y="167" text-anchor="middle">picks 2 at random</text></g>
+              <g class="d-node" style="--i:4"><rect x="560" y="30" width="180" height="70" rx="10"/><text class="d-text" x="650" y="60" text-anchor="middle">Replica A</text><text class="d-sub" x="650" y="82" text-anchor="middle">7 busy</text></g>
+              <g class="d-node accent" style="--i:5"><rect x="560" y="200" width="180" height="70" rx="10"/><text class="d-text" x="650" y="230" text-anchor="middle">Replica B</text><text class="d-sub" x="650" y="252" text-anchor="middle">2 busy: chosen</text></g>
+              <path class="d-edge" style="--i:1" d="M160 150 L250 150"/>
+              <path class="d-arrow" style="--i:1" d="M250 150 L240 145 L240 155 Z"/>
+              <path class="d-edge" style="--i:3" d="M410 135 L560 65"/>
+              <path class="d-arrow" style="--i:3" d="M560 65 L549 66 L553 75 Z"/>
+              <path class="d-edge accent" style="--i:6" d="M410 165 L560 235"/>
+              <path class="d-arrow" style="--i:6" d="M560 235 L553 226 L549 235 Z"/>
+              <text class="d-label" style="--i:7" x="440" y="105" text-anchor="middle">compare</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 150 L250 150 L330 150 L410 165 L560 235 L650 235"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Only two replicas are looked at per request, yet the busiest ones rarely win.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Random choice alone is cheap but sometimes unlucky: a busy replica can be picked several times in a row. Looking at everyone is accurate but slow and makes all balancers rush to the same machine. Comparing just two is the sweet spot. Research on this idea found that it avoids most of the pile-ups of pure random choice while needing almost none of the bookkeeping of checking everyone.</p>
+          <p>It also suits the real setup: there are many Envoy proxies, each with only its own view of the replicas. A rule that needs no shared, up-to-date global picture works well when nobody has one.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Asking two at random beats guessing blind, and costs far less than asking everyone.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident that Envoy's least-request balancer samples a small number of hosts (two by default) and picks the one with fewer active requests, and that it is configurable. I haven't re-checked the exact default behaviour for every Envoy version, or how it interacts with weighted replicas, so I've kept those details out.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A slow server gets fewer requests without anyone telling the balancer.</strong> Its unanswered requests pile up, so it keeps losing the comparison.</li>
+            <li><strong>A crashing replica disappears quickly.</strong> With <dfn class="term" title="Temporarily removing a replica that keeps failing.">outlier detection</dfn>, Envoy notices repeated errors from one replica and stops sending it traffic for a while, then tries it again.</li>
+            <li><strong>Load is never perfectly even, and that is fine.</strong> The goal is to avoid the badly overloaded cases, not to match every machine exactly.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Envoy's public documentation on load balancers and outlier detection, and Mitzenmacher's research on the "power of two choices". Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-12-bgp-internet-routing" data-topic="BGP internet routing" data-domain="Protocols" data-date="2026-11-12">
       <header class="entry-head">
         <div class="entry-meta">
