@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-14-wikipedia-caching"><time datetime="2026-11-14">2026-11-14</time><span>Wikipedia: how anyone can edit a page that millions are reading</span></a></li>
         <li><a href="#2026-11-13-envoy-load-balancing"><time datetime="2026-11-13">2026-11-13</time><span>Envoy: how a proxy picks one of a hundred servers by asking only two</span></a></li>
         <li><a href="#2026-11-12-bgp-internet-routing"><time datetime="2026-11-12">2026-11-12</time><span>BGP: how the internet's thousands of networks find each other on trust alone</span></a></li>
         <li><a href="#2026-11-11-dropbox-sync"><time datetime="2026-11-11">2026-11-11</time><span>Dropbox: how fixing a typo in a huge file doesn't re-upload it</span></a></li>
@@ -285,6 +286,87 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-14-wikipedia-caching" data-topic="Wikipedia caching and purging" data-domain="Consumer apps" data-date="2026-11-14">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-11-14">14 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Wikipedia: how anyone can edit a page that millions are reading</h2>
+        <p class="lede">Wikipedia is read constantly and edited by anyone, all day. The design challenge: building a page is expensive, so it must be reused for readers, yet a fresh edit has to show up for everyone within moments.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Cache</dt><dd>A saved copy of an answer so it can be handed out again without redoing the work.</dd></div>
+            <div><dt>Edge cache</dt><dd>A cache run at data centers close to readers, in front of the main servers. Most page views are answered here.</dd></div>
+            <div><dt>Rendering</dt><dd>Turning the stored page text (wiki markup) into the HTML a browser shows.</dd></div>
+            <div><dt>Purge</dt><dd>A message telling a cache to throw away its saved copy of one page so the next request fetches a fresh one.</dd></div>
+            <div><dt>Job queue</dt><dd>A to-do list of slower background tasks that run shortly after an edit instead of while the editor waits.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Think about a popular article, like the page for a country. Thousands of people open it every minute. Each of them wants the same page, so it would be wasteful to build it from scratch every time.</p>
+          <p>Wikipedia runs on software called MediaWiki. Articles are stored as <em>markup</em> text in a database. To show one, the software does the <dfn class="term" title="Turning stored wiki markup into the HTML a browser displays.">rendering</dfn>, which means expanding templates, building tables and links, and producing HTML. That work is slow compared to just handing over a finished file.</p>
+          <p>So the finished HTML is kept in layers of <dfn class="term" title="A saved copy of an answer, reused instead of redoing the work.">cache</dfn>. The outermost layer is an <dfn class="term" title="A cache in data centers close to readers, in front of the main servers.">edge cache</dfn> near the reader. Behind it, MediaWiki keeps its own saved render of each page. A typical anonymous reader gets the saved copy and never touches the database at all.</p>
+          <p>When someone edits, the new text is written to the database, and then the software sends a <dfn class="term" title="A message telling a cache to drop its saved copy of one page.">purge</dfn> for just that page. The next reader gets a fresh render, and that copy is saved again for everyone after.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: readers are served from the edge cache; an edit goes to MediaWiki and the database, then a purge clears the edge cache. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-14-wikipedia-caching-d1-t 2026-11-14-wikipedia-caching-d1-d">
+              <title id="2026-11-14-wikipedia-caching-d1-t">Reads hit the cache, edits trigger a purge</title>
+              <desc id="2026-11-14-wikipedia-caching-d1-d">A reader's request is answered by the edge cache. An editor's change goes to MediaWiki and its database, and MediaWiki then sends a purge to the edge cache so the next read is fresh.</desc>
+              <g class="d-node alt" style="--i:0"><rect x="20" y="40" width="140" height="70" rx="10"/><text class="d-text" x="90" y="70" text-anchor="middle">Reader</text><text class="d-sub" x="90" y="92" text-anchor="middle">views a page</text></g>
+              <g class="d-node alt" style="--i:0"><rect x="20" y="190" width="140" height="70" rx="10"/><text class="d-text" x="90" y="220" text-anchor="middle">Editor</text><text class="d-sub" x="90" y="242" text-anchor="middle">saves a change</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="290" y="40" width="160" height="70" rx="10"/><text class="d-text" x="370" y="70" text-anchor="middle">Edge cache</text><text class="d-sub" x="370" y="92" text-anchor="middle">saved copies</text></g>
+              <g class="d-node" style="--i:4"><rect x="290" y="190" width="160" height="70" rx="10"/><text class="d-text" x="370" y="220" text-anchor="middle">MediaWiki</text><text class="d-sub" x="370" y="242" text-anchor="middle">renders and stores</text></g>
+              <g class="d-node" style="--i:6"><rect x="570" y="190" width="170" height="70" rx="10"/><text class="d-text" x="655" y="220" text-anchor="middle">Database</text><text class="d-sub" x="655" y="242" text-anchor="middle">page text</text></g>
+              <path class="d-edge" style="--i:1" d="M160 75 L290 75"/>
+              <path class="d-arrow" style="--i:1" d="M290 75 L280 70 L280 80 Z"/>
+              <path class="d-edge" style="--i:3" d="M160 225 L290 225"/>
+              <path class="d-arrow" style="--i:3" d="M290 225 L280 220 L280 230 Z"/>
+              <path class="d-edge" style="--i:5" d="M450 225 L570 225"/>
+              <path class="d-arrow" style="--i:5" d="M570 225 L560 220 L560 230 Z"/>
+              <path class="d-edge accent" style="--i:7" d="M370 190 L370 110"/>
+              <path class="d-arrow" style="--i:7" d="M370 110 L365 120 L375 120 Z"/>
+              <text class="d-label" style="--i:8" x="440" y="155" text-anchor="start">purge this page</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 225 L290 225 L370 225 L370 110"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Readers are answered from saved copies; an edit reaches the cache only as a purge for that one page.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Wikipedia has far more readers than editors, by a huge margin. That lopsided ratio is what makes the whole design work: do the expensive work once per edit, and let everyone reading afterwards share the result.</p>
+          <p>The simpler alternative is to let each cached copy expire after a few minutes. That is easy but means edits look stale, and vandalism cleanups would stay invisible for a while. Purging a single page keeps copies long-lived and still shows changes quickly.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Many readers, few writers: render once, share widely, and clear only what changed.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident about the overall shape: edge caching in front of MediaWiki, a parser cache for rendered pages, and purges sent when a page changes. I'm less sure of the exact software and transport used for purges today (it has changed over the years), so I've not named them. Also, logged-in readers usually bypass the shared edge copy, since their pages can differ.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Your own edit shows up right away, and others see it within moments.</strong> The purge clears the old copy, and the next request builds a fresh one.</li>
+            <li><strong>Logged-in users can see things anonymous readers don't.</strong> Their pages include personal details like their name and preferences, so a single shared copy won't do.</li>
+            <li><strong>Pages that use a changed template or link update a little later.</strong> Those follow-on updates run from a <dfn class="term" title="A to-do list of slower background tasks that run after an edit.">job queue</dfn> in the background, so saving your edit stays fast.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: MediaWiki's public documentation on caching and the job queue, and Wikimedia's engineering write-ups. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-13-envoy-load-balancing" data-topic="Envoy load balancing" data-domain="Infra" data-date="2026-11-13">
       <header class="entry-head">
         <div class="entry-meta">
