@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-15-linux-page-cache-fsync"><time datetime="2026-11-15">2026-11-15</time><span>Linux: why "saved" doesn't mean your data is on the disk yet</span></a></li>
         <li><a href="#2026-11-14-wikipedia-caching"><time datetime="2026-11-14">2026-11-14</time><span>Wikipedia: how anyone can edit a page that millions are reading</span></a></li>
         <li><a href="#2026-11-13-envoy-load-balancing"><time datetime="2026-11-13">2026-11-13</time><span>Envoy: how a proxy picks one of a hundred servers by asking only two</span></a></li>
         <li><a href="#2026-11-12-bgp-internet-routing"><time datetime="2026-11-12">2026-11-12</time><span>BGP: how the internet's thousands of networks find each other on trust alone</span></a></li>
@@ -286,6 +287,82 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-15-linux-page-cache-fsync" data-topic="Linux page cache and fsync" data-domain="OS/runtime internals" data-date="2026-11-15">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">OS/runtime internals</span>
+          <time datetime="2026-11-15">15 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Linux: why "saved" doesn't mean your data is on the disk yet</h2>
+        <p class="lede">When a program saves a file, the call returns almost instantly, even though disks are slow. The design challenge: the operating system must feel fast, yet a database still needs a way to be sure its data survives a power cut.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Page cache</dt><dd>A part of the computer's memory (RAM) where Linux keeps recently used file contents, so it doesn't have to go back to the disk.</dd></div>
+            <div><dt>Dirty page</dt><dd>A chunk of the page cache that has been changed in memory but not yet written to the disk.</dd></div>
+            <div><dt>Writeback</dt><dd>The background work where the kernel copies dirty pages to the disk a little later.</dd></div>
+            <div><dt>fsync</dt><dd>A system call that means "don't return until this file's changes are safely on the disk."</dd></div>
+            <div><dt>Durability</dt><dd>The promise that data you were told is saved will still be there after a crash or power loss.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say your app saves a small file. It calls <code>write()</code>, and a fraction of a millisecond later the call returns. It feels like the file is on the disk. Usually, it is not.</p>
+          <p>Linux copies your bytes into the <dfn class="term" title="Memory where Linux keeps file contents so it can skip slow disk trips.">page cache</dfn> in RAM, marks that chunk as a <dfn class="term" title="A cached chunk that was changed in memory but not yet written to disk.">dirty page</dfn>, and returns right away. Later, in the background, the kernel does <dfn class="term" title="The kernel's background copying of dirty pages to disk.">writeback</dfn>: it gathers many dirty pages and writes them out together, which is much faster than many tiny writes.</p>
+          <p>Reads benefit too. The second time any program reads that file, it comes straight from RAM. That is why Linux seems to use all your memory: it is mostly filled with cached files, and it gives that space back when programs need it.</p>
+          <p>If the power fails before writeback happens, the change is simply gone. For a game save, that is fine. For a bank's database, it is not. So programs get a way to ask for certainty: <dfn class="term" title="A call that waits until a file's changes are safely on the disk.">fsync</dfn>. It forces the dirty pages of that file out to the disk and only returns once the disk says they are stored. A database calls it when it commits a transaction, because only then can it tell you "done" and mean it. That promise is called <dfn class="term" title="Data you were told is saved survives crashes and power loss.">durability</dfn>.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: write copies data into the page cache and returns fast; fsync forces it to the disk. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-15-linux-page-cache-fsync-d1-t 2026-11-15-linux-page-cache-fsync-d1-d">
+              <title id="2026-11-15-linux-page-cache-fsync-d1-t">write goes to memory, fsync goes to disk</title>
+              <desc id="2026-11-15-linux-page-cache-fsync-d1-d">A program's write is copied into the page cache in memory and returns quickly. The kernel later copies it to the disk in the background, or immediately if the program calls fsync.</desc>
+              <g class="d-node alt" style="--i:0"><rect x="20" y="115" width="140" height="70" rx="10"/><text class="d-text" x="90" y="145" text-anchor="middle">Program</text><text class="d-sub" x="90" y="167" text-anchor="middle">saves a file</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="290" y="115" width="170" height="70" rx="10"/><text class="d-text" x="375" y="145" text-anchor="middle">Page cache</text><text class="d-sub" x="375" y="167" text-anchor="middle">in RAM, fast</text></g>
+              <g class="d-node" style="--i:5"><rect x="590" y="115" width="150" height="70" rx="10"/><text class="d-text" x="665" y="145" text-anchor="middle">Disk</text><text class="d-sub" x="665" y="167" text-anchor="middle">slow, permanent</text></g>
+              <path class="d-edge" style="--i:1" d="M160 150 L290 150"/>
+              <path class="d-arrow" style="--i:1" d="M290 150 L280 145 L280 155 Z"/>
+              <text class="d-label" style="--i:3" x="225" y="130" text-anchor="middle">write()</text>
+              <path class="d-edge accent" style="--i:4" d="M460 150 L590 150"/>
+              <path class="d-arrow" style="--i:4" d="M590 150 L580 145 L580 155 Z"/>
+              <text class="d-label" style="--i:6" x="525" y="130" text-anchor="middle">later, or on fsync</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M160 150 L290 150 L375 150 L590 150 L665 150"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The program is told "done" at the first arrow. Only the second arrow makes the data survive a power cut.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The gap in speed is huge: RAM answers in tens of nanoseconds, while even a fast SSD takes far longer, and spinning disks much longer still. If every write waited for the disk, every program would crawl.</p>
+          <p>Delaying the write also lets the kernel batch work, merge several changes to the same page into one, and order writes sensibly. The cost is a window of time where the OS has said "ok" but the data lives only in RAM. Making durability an explicit, opt-in request lets most programs be fast, and the few that need safety pay for it on purpose.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Fast by default, safe on request: the OS says "ok" when your data is in memory, not when it is on disk.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the overall model: write goes to the page cache, the kernel flushes dirty pages in the background after a delay of some seconds, and fsync forces a flush. The exact timings are tunable settings and differ by distribution, so I haven't quoted them. Whether a drive's own internal cache honors the flush request also depends on the hardware and filesystem; I'm not going into those details.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Pulling out a USB stick without "ejecting" can corrupt files.</strong> Ejecting makes the OS finish writeback first. Yanking it leaves some dirty pages only in RAM.</li>
+            <li><strong>Databases are slower when they promise safety.</strong> Each commit waits on an fsync to real storage, so settings that skip or delay it trade safety for speed. Many databases batch several commits into one fsync to soften the cost.</li>
+            <li><strong>A failed fsync is a serious event.</strong> In 2018 PostgreSQL developers found that after a failed fsync, Linux could mark the pages clean, so a retry would "succeed" without the data ever reaching disk. Postgres now treats a failed fsync as a crash and recovers from its log rather than retrying.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the Linux man pages for write(2) and fsync(2), kernel documentation on writeback, and the 2018 PostgreSQL community discussion of fsync error handling. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-14-wikipedia-caching" data-topic="Wikipedia caching and purging" data-domain="Consumer apps" data-date="2026-11-14">
       <header class="entry-head">
         <div class="entry-meta">
