@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-16-cassandra-lsm"><time datetime="2026-11-16">2026-11-16</time><span>Cassandra: a database that never edits anything it has written</span></a></li>
         <li><a href="#2026-11-15-linux-page-cache-fsync"><time datetime="2026-11-15">2026-11-15</time><span>Linux: why "saved" doesn't mean your data is on the disk yet</span></a></li>
         <li><a href="#2026-11-14-wikipedia-caching"><time datetime="2026-11-14">2026-11-14</time><span>Wikipedia: how anyone can edit a page that millions are reading</span></a></li>
         <li><a href="#2026-11-13-envoy-load-balancing"><time datetime="2026-11-13">2026-11-13</time><span>Envoy: how a proxy picks one of a hundred servers by asking only two</span></a></li>
@@ -287,6 +288,85 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-16-cassandra-lsm" data-topic="Cassandra write path and LSM trees" data-domain="Databases" data-date="2026-11-16">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-11-16">16 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Cassandra: a database that never edits anything it has written</h2>
+        <p class="lede">Apps like messaging and activity feeds save a flood of small writes every second. The design challenge: random edits on a disk are slow, so Cassandra avoids them completely and only ever adds new data to the end of things.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Commit log</dt><dd>A file where every write is appended first, one after another, so the write survives a crash.</dd></div>
+            <div><dt>Memtable</dt><dd>A sorted table kept in memory that holds the newest writes until there are enough to save to disk.</dd></div>
+            <div><dt>SSTable</dt><dd>A sorted file on disk, written once and never changed afterwards.</dd></div>
+            <div><dt>Compaction</dt><dd>A background job that merges several SSTables into one, keeping only the newest value for each key.</dd></div>
+            <div><dt>Bloom filter</dt><dd>A small summary of a file that can say "this key is definitely not in here" very cheaply. It can occasionally be wrong in the other direction, saying "maybe" when the key is absent.</dd></div>
+            <div><dt>Tombstone</dt><dd>A marker that says "this item was deleted". The old data is hidden by it, then removed later.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Picture a chat app saving a message. The database could find the right spot in a big file on disk and change it in place. But jumping around a disk to do that is slow, and thousands of writes a second would pile up.</p>
+          <p>Apache Cassandra does it differently, using a layout called a log-structured merge tree (LSM). A write does two cheap things. First it is appended to the <dfn class="term" title="An append-only file that records every write so it survives a crash.">commit log</dfn> on disk, which is just adding to the end of a file. Then it goes into the <dfn class="term" title="A sorted in-memory table holding the newest writes.">memtable</dfn> in memory. Then Cassandra says "done". No searching, no editing.</p>
+          <p>When the memtable gets big, it is written out to disk in one go as an <dfn class="term" title="A sorted file on disk that is written once and never modified.">SSTable</dfn>. That file is never touched again. If you update a value, the new value simply lands in a newer SSTable, and the old one stays where it is for now.</p>
+          <p>That means a read may need to look in the memtable and several SSTables, and take the newest answer. To keep that cheap, each SSTable has a <dfn class="term" title="A tiny summary that can say a key is definitely absent from a file.">bloom filter</dfn>, so most files get skipped without being opened. And in the background, <dfn class="term" title="A background merge of several SSTables into one, keeping only the latest values.">compaction</dfn> merges SSTables together so reads have fewer files to check.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a write goes to the commit log and the memtable, then the memtable is flushed to an SSTable on disk. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-16-cassandra-lsm-d1-t 2026-11-16-cassandra-lsm-d1-d">
+              <title id="2026-11-16-cassandra-lsm-d1-t">Cassandra write path</title>
+              <desc id="2026-11-16-cassandra-lsm-d1-d">A write is appended to the commit log on disk and added to the memtable in memory. When the memtable fills, it is flushed to a new SSTable file, and compaction later merges SSTables.</desc>
+              <g class="d-node alt" style="--i:0"><rect x="20" y="115" width="130" height="70" rx="10"/><text class="d-text" x="85" y="145" text-anchor="middle">Write</text><text class="d-sub" x="85" y="167" text-anchor="middle">new message</text></g>
+              <g class="d-node" style="--i:2"><rect x="280" y="30" width="170" height="70" rx="10"/><text class="d-text" x="365" y="60" text-anchor="middle">Commit log</text><text class="d-sub" x="365" y="82" text-anchor="middle">append, on disk</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="280" y="200" width="170" height="70" rx="10"/><text class="d-text" x="365" y="230" text-anchor="middle">Memtable</text><text class="d-sub" x="365" y="252" text-anchor="middle">sorted, in memory</text></g>
+              <g class="d-node" style="--i:5"><rect x="580" y="200" width="160" height="70" rx="10"/><text class="d-text" x="660" y="230" text-anchor="middle">SSTable</text><text class="d-sub" x="660" y="252" text-anchor="middle">never edited</text></g>
+              <path class="d-edge" style="--i:1" d="M150 140 L215 140 L215 65 L280 65"/>
+              <path class="d-arrow" style="--i:1" d="M280 65 L270 60 L270 70 Z"/>
+              <path class="d-edge" style="--i:1" d="M150 160 L215 160 L215 235 L280 235"/>
+              <path class="d-arrow" style="--i:1" d="M280 235 L270 230 L270 240 Z"/>
+              <path class="d-edge accent" style="--i:4" d="M450 235 L580 235"/>
+              <path class="d-arrow" style="--i:4" d="M580 235 L570 230 L570 240 Z"/>
+              <text class="d-label" style="--i:6" x="515" y="220" text-anchor="middle">when full</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M150 160 L215 160 L215 235 L280 235 L365 235 L580 235 L660 235"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>A write only ever appends or lands in memory. Files on disk are created whole, never edited.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Writing in order, one record after another, is the thing disks are best at. Hunting for a spot and rewriting it is the thing they are worst at. By turning every write into an append, Cassandra makes the common case as fast as the hardware allows.</p>
+          <p>The price is paid elsewhere. Reads have to check more places, and compaction has to keep rewriting data in the background. This is the central LSM trade-off: cheap writes, in exchange for extra read and background work. Databases that edit in place, like many classic ones, choose the opposite.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Never edit, only add: speed on write, tidying up later.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the commit log, memtable, SSTable, bloom filter and compaction flow, which is also the model used by RocksDB and others. Cassandra's defaults, such as the delay before tombstones can be purged, are configurable and I'm giving them from memory, so check the current documentation before relying on them.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Deleting data doesn't free space right away.</strong> Files are never edited, so a delete is just a new <dfn class="term" title="A marker saying an item was deleted; it hides older values until compaction removes them.">tombstone</dfn> hiding the old value. The space comes back only after compaction. Tombstones are kept for a while (about ten days by default, from memory) so that servers that were offline still hear about the delete.</li>
+            <li><strong>Heavy writes are cheap, but reads can slow down if files pile up.</strong> More SSTables means more places to check, until compaction catches up.</li>
+            <li><strong>Disk usage can spike during compaction.</strong> Merging builds a new file before the old ones are deleted, so for a moment both exist.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the Apache Cassandra documentation on the storage engine and compaction, and the original LSM-tree paper by O'Neil et al. (1996). Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-15-linux-page-cache-fsync" data-topic="Linux page cache and fsync" data-domain="OS/runtime internals" data-date="2026-11-15">
       <header class="entry-head">
         <div class="entry-meta">
