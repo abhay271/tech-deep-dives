@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-18-youtube-transcoding"><time datetime="2026-11-18">2026-11-18</time><span>YouTube: what happens in the minutes after you hit Upload</span></a></li>
         <li><a href="#2026-11-17-oauth-sign-in"><time datetime="2026-11-17">2026-11-17</time><span>OAuth: how "Sign in with Google" works without the app seeing your password</span></a></li>
         <li><a href="#2026-11-16-cassandra-lsm"><time datetime="2026-11-16">2026-11-16</time><span>Cassandra: a database that never edits anything it has written</span></a></li>
         <li><a href="#2026-11-15-linux-page-cache-fsync"><time datetime="2026-11-15">2026-11-15</time><span>Linux: why "saved" doesn't mean your data is on the disk yet</span></a></li>
@@ -289,6 +290,89 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-18-youtube-transcoding" data-topic="YouTube video processing" data-domain="Consumer apps" data-date="2026-11-18">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-11-18">18 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">YouTube: what happens in the minutes after you hit Upload</h2>
+        <p class="lede">You upload one huge video file from your phone, and soon people on slow trains and giant TVs can all watch it smoothly. The design challenge: one file has to become many versions, fast, for a flood of uploads every minute.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Codec</dt><dd>A method for squeezing video into far fewer bytes, and for unpacking it again. H.264, VP9 and AV1 are examples; newer ones squeeze more but take more work.</dd></div>
+            <div><dt>Transcoding</dt><dd>Converting a video from one format, size or quality into another.</dd></div>
+            <div><dt>Chunk</dt><dd>A short slice of a video, a few seconds long, that can be processed or played on its own.</dd></div>
+            <div><dt>Adaptive bitrate streaming</dt><dd>The player picks a quality level chunk by chunk, based on how fast your connection is right now, and switches whenever that changes.</dd></div>
+            <div><dt>ASIC</dt><dd>A chip built to do one job only. It does that job much more efficiently than a general-purpose processor.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Your upload is usually a big file in whatever your camera produced. Nobody can watch that directly: it may be too large, in a format their device can't play, and far too heavy for a phone on a weak signal. So YouTube turns it into a whole ladder of versions, from tiny to very sharp.</p>
+          <p>That job is called <dfn class="term" title="Converting a video into another format, size or quality.">transcoding</dfn>, and it is slow work. Compressing video well means trying lots of options for every frame. If one machine did a long video start to finish, you would wait a very long time.</p>
+          <p>So the video is cut into <dfn class="term" title="A short slice of video that can be handled independently.">chunks</dfn>, and many machines work on different chunks at the same time. The results are stitched back together as a set of files. Each quality level is stored as its own run of chunks, using one or more <dfn class="term" title="A method for compressing video, such as H.264, VP9 or AV1.">codecs</dfn>.</p>
+          <p>When you press play, the player uses <dfn class="term" title="The player chooses a quality level chunk by chunk, based on current connection speed.">adaptive bitrate streaming</dfn>. It fetches a few seconds at a time and, before each next chunk, decides which quality to ask for. Your connection drops in a tunnel, so the next chunk comes from a lower rung of the ladder. You see a blurrier picture, not a frozen one.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: an uploaded video is split into chunks, converted in parallel into several qualities, and the player picks one quality per chunk. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-18-youtube-transcoding-d1-t 2026-11-18-youtube-transcoding-d1-d">
+              <title id="2026-11-18-youtube-transcoding-d1-t">From upload to playback</title>
+              <desc id="2026-11-18-youtube-transcoding-d1-d">One uploaded video is split into chunks. Many workers convert the chunks into several quality levels. The player then picks a quality level for each chunk it downloads.</desc>
+              <g class="d-node alt" style="--i:0"><rect x="20" y="115" width="130" height="70" rx="10"/><text class="d-text" x="85" y="145" text-anchor="middle">Upload</text><text class="d-sub" x="85" y="167" text-anchor="middle">one big file</text></g>
+              <g class="d-node" style="--i:2"><rect x="250" y="30" width="170" height="60" rx="10"/><text class="d-text" x="335" y="66" text-anchor="middle">Worker A</text></g>
+              <g class="d-node" style="--i:2"><rect x="250" y="120" width="170" height="60" rx="10"/><text class="d-text" x="335" y="156" text-anchor="middle">Worker B</text></g>
+              <g class="d-node" style="--i:2"><rect x="250" y="210" width="170" height="60" rx="10"/><text class="d-text" x="335" y="246" text-anchor="middle">Worker C</text></g>
+              <g class="d-node accent" style="--i:5"><rect x="570" y="105" width="170" height="90" rx="10"/><text class="d-text" x="655" y="140" text-anchor="middle">Quality ladder</text><text class="d-sub" x="655" y="164" text-anchor="middle">small to sharp</text></g>
+              <path class="d-edge" style="--i:1" d="M150 150 L200 150 L200 60 L250 60"/>
+              <path class="d-arrow" style="--i:1" d="M250 60 L240 55 L240 65 Z"/>
+              <path class="d-edge" style="--i:1" d="M150 150 L250 150"/>
+              <path class="d-arrow" style="--i:1" d="M250 150 L240 145 L240 155 Z"/>
+              <path class="d-edge" style="--i:1" d="M150 150 L200 150 L200 240 L250 240"/>
+              <path class="d-arrow" style="--i:1" d="M250 240 L240 235 L240 245 Z"/>
+              <text class="d-label" style="--i:3" x="200" y="100" text-anchor="middle">chunks</text>
+              <path class="d-edge accent" style="--i:4" d="M420 60 L495 60 L495 150 L570 150"/>
+              <path class="d-edge accent" style="--i:4" d="M420 150 L570 150"/>
+              <path class="d-edge accent" style="--i:4" d="M420 240 L495 240 L495 150 L570 150"/>
+              <path class="d-arrow" style="--i:4" d="M570 150 L560 145 L560 155 Z"/>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M150 150 L250 150 L420 150 L570 150 L655 150"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Many workers each convert a few chunks, so a long video is ready much sooner than one machine could do it.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Every video is uploaded once but watched many times, often by millions. So it pays to spend a lot of computing up front to make files smaller: every byte saved is saved on every single view. Better codecs like AV1 save a lot of bandwidth, but they are much more expensive to produce.</p>
+          <p>Google went as far as building its own <dfn class="term" title="A chip designed to do one job only, very efficiently.">ASIC</dfn> chips just for video transcoding, because doing this on ordinary servers at YouTube's scale cost too much. The trade-off is clear: heavy, specialised work once, in exchange for cheap and smooth playback everywhere.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Do the expensive work once, so every viewer gets a cheap one.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the overall shape: chunked parallel transcoding, several qualities, adaptive streaming, and custom transcoding chips. How YouTube decides which videos get the expensive codecs (popular ones are likelier to), and the exact order it finishes versions in, are details I'm not stating firmly. I left out exact numbers on purpose.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>A fresh upload looks blurry at first.</strong> Lower qualities are quicker to make, so they can appear first while the sharper ones are still being worked on.</li>
+            <li><strong>Quality changes mid-video.</strong> Each chunk is a fresh choice, so when your connection changes the player just picks a different rung for the next one.</li>
+            <li><strong>Popular videos get better compression than obscure ones.</strong> Spending extra effort on smaller files only pays off when many people will watch.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Google's paper on its video transcoding chip, "Warehouse-Scale Video Acceleration" (ASPLOS 2021), and the MPEG-DASH adaptive streaming standard. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-17-oauth-sign-in" data-topic="OAuth 2.0 and Sign in with Google" data-domain="Protocols" data-date="2026-11-17">
       <header class="entry-head">
         <div class="entry-meta">
