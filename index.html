@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-20-prometheus-monitoring"><time datetime="2026-11-20">2026-11-20</time><span>Prometheus: how engineers spot an unhealthy server before users complain</span></a></li>
         <li><a href="#2026-11-19-npm-node-modules"><time datetime="2026-11-19">2026-11-19</time><span>npm: why a tiny project downloads thousands of files</span></a></li>
         <li><a href="#2026-11-18-youtube-transcoding"><time datetime="2026-11-18">2026-11-18</time><span>YouTube: what happens in the minutes after you hit Upload</span></a></li>
         <li><a href="#2026-11-17-oauth-sign-in"><time datetime="2026-11-17">2026-11-17</time><span>OAuth: how "Sign in with Google" works without the app seeing your password</span></a></li>
@@ -291,6 +292,90 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-20-prometheus-monitoring" data-topic="Prometheus monitoring" data-domain="Infra" data-date="2026-11-20">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-11-20">20 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Prometheus: how engineers know a server is unhealthy before users complain</h2>
+        <p class="lede">A company runs thousands of servers, and each one produces numbers all day: requests handled, errors, memory used. The design challenge: collect all of it, keep it cheap, and still answer "what changed at 3pm?" in a second.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Metric</dt><dd>A number a program keeps about itself, such as "total requests served so far" or "memory in use right now".</dd></div>
+            <div><dt>Scrape</dt><dd>Fetching a program's current metrics by making an ordinary web request to it.</dd></div>
+            <div><dt>Time series</dt><dd>One metric's values recorded over time, like a list of (time, value) pairs.</dd></div>
+            <div><dt>Label</dt><dd>A tag attached to a metric, such as <code>service="checkout"</code> or <code>status="500"</code>, used to slice and filter.</dd></div>
+            <div><dt>Service discovery</dt><dd>Asking a system that knows what is running (like Kubernetes) for the current list of servers, instead of keeping that list by hand.</dd></div>
+            <div><dt>Alert</dt><dd>A rule that fires a message to a person when a condition holds, for example "error rate above 5% for 10 minutes".</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Each program you run can keep a few <dfn class="term" title="A number a program keeps about itself, like requests served so far.">metrics</dfn> and show them on a plain web page, usually at <code>/metrics</code>. It looks like a list of lines: a name, some tags, a number.</p>
+          <p><a href="https://prometheus.io" rel="noopener">Prometheus</a> is a separate server whose whole job is to visit those pages. Every 15 seconds or so it does a <dfn class="term" title="Fetching a program's current metrics with a normal web request.">scrape</dfn> of every target and saves what it sees. Notice the direction: the monitored programs never send anything. Prometheus comes and asks.</p>
+          <p>How does it know who to ask? Through <dfn class="term" title="Asking a system that knows what is running for the current list of servers.">service discovery</dfn>. In Kubernetes, servers come and go constantly, so Prometheus asks the cluster for the current list each time instead of relying on a file someone edits.</p>
+          <p>What it stores is a <dfn class="term" title="One metric's values over time, as (time, value) pairs.">time series</dfn> for each distinct combination of name and <dfn class="term" title="A tag on a metric, like service=checkout, used to slice and filter.">labels</dfn>. Because every sample is just a timestamp and a number, the database can pack them extremely tightly: it stores the small difference from the previous sample instead of the whole value, and steady numbers shrink to almost nothing.</p>
+          <p>New data first goes to memory and an append-only log on disk, so a crash loses nothing. Every couple of hours it is written out as an immutable block of files. Old blocks are deleted when they pass your retention limit.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: Prometheus asks service discovery for targets, scrapes each one, stores the results, and sends alerts. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-20-prometheus-monitoring-d1-t 2026-11-20-prometheus-monitoring-d1-d">
+              <title id="2026-11-20-prometheus-monitoring-d1-t">Prometheus pull model</title>
+              <desc id="2026-11-20-prometheus-monitoring-d1-d">Prometheus asks service discovery which servers exist, then scrapes the metrics page of each server. Results are saved in its time series store, and a rule that matches sends an alert to a person.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="115" width="150" height="70" rx="10"/><text class="d-text" x="95" y="145" text-anchor="middle">Service</text><text class="d-sub" x="95" y="167" text-anchor="middle">discovery</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="270" y="105" width="190" height="90" rx="10"/><text class="d-text" x="365" y="140" text-anchor="middle">Prometheus</text><text class="d-sub" x="365" y="164" text-anchor="middle">scrapes + stores</text></g>
+              <g class="d-node" style="--i:4"><rect x="560" y="30" width="180" height="60" rx="10"/><text class="d-text" x="650" y="66" text-anchor="middle">Server /metrics</text></g>
+              <g class="d-node" style="--i:4"><rect x="560" y="120" width="180" height="60" rx="10"/><text class="d-text" x="650" y="156" text-anchor="middle">Server /metrics</text></g>
+              <g class="d-node alt" style="--i:6"><rect x="270" y="225" width="190" height="60" rx="10"/><text class="d-text" x="365" y="261" text-anchor="middle">Alert to a person</text></g>
+              <path class="d-edge" style="--i:1" d="M170 150 L270 150"/>
+              <path class="d-arrow" style="--i:1" d="M270 150 L260 145 L260 155 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M460 135 L510 135 L510 60 L560 60"/>
+              <path class="d-arrow" style="--i:3" d="M560 60 L550 55 L550 65 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M460 160 L510 160 L510 150 L560 150"/>
+              <path class="d-arrow" style="--i:3" d="M560 150 L550 145 L550 155 Z"/>
+              <path class="d-edge" style="--i:5" d="M365 195 L365 225"/>
+              <path class="d-arrow" style="--i:5" d="M365 225 L360 215 L370 215 Z"/>
+              <text class="d-label" style="--i:2" x="220" y="138" text-anchor="middle">who exists?</text>
+              <text class="d-label" style="--i:3" x="535" y="108" text-anchor="middle">asks</text>
+            </svg>
+          </div>
+          <figcaption>Prometheus pulls. It asks what exists, visits each server's metrics page on a timer, and checks its rules against what it stored.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Pulling instead of pushing makes the health check free. If a server is down, the scrape fails, and that failure is itself the first signal. With pushing, silence is ambiguous: is the server dead, or just quiet? Pulling also means a broken or overloaded server can't flood the monitoring system, because Prometheus sets the pace. And you can open <code>/metrics</code> in a browser to see exactly what it will see.</p>
+          <p>The cost is that short-lived jobs, like a script that runs for two seconds, may finish between scrapes. Those need a small go-between (Prometheus calls it a Pushgateway) that holds their numbers until the next scrape.</p>
+          <p>Labels are the other big choice, and a dangerous one. Each new label value creates a brand new time series. Tagging by <code>status</code> is fine; tagging by user ID gives you millions of series and can exhaust the memory of the server. Teams call this the cardinality problem.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Instead of waiting for servers to report in, ask them. A server that doesn't answer is already telling you something.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident about pull-based scraping, labels defining separate series, the write-ahead log plus immutable blocks, and the cardinality warning. I'm less sure of exact defaults such as the scrape interval and block length, so I said "every 15 seconds or so" and "every couple of hours" instead of stating numbers.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Dashboards of "requests per second".</strong> The stored value is a running total; the query subtracts one sample from the next to get a rate.</li>
+            <li><strong>Gaps in a graph when a service restarts.</strong> The counter resets to zero and the scrapes in between failed, so the data really isn't there.</li>
+            <li><strong>Alerts that wait ten minutes before paging.</strong> An <dfn class="term" title="A rule that messages a person when a condition holds for some time.">alert</dfn> usually requires the condition to hold for a while, so one blip at a single scrape doesn't wake someone at night.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the Prometheus documentation (overview, storage, and "Instrumentation best practices" on labels) and the Prometheus TSDB design write-ups by its authors. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-19-npm-node-modules" data-topic="npm and node_modules" data-domain="Dev tools" data-date="2026-11-19">
       <header class="entry-head">
         <div class="entry-meta">
