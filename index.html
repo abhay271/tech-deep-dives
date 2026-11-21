@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-21-webassembly"><time datetime="2026-11-21">2026-11-21</time><span>WebAssembly: how a web page runs code that wasn't written for the web</span></a></li>
         <li><a href="#2026-11-20-prometheus-monitoring"><time datetime="2026-11-20">2026-11-20</time><span>Prometheus: how engineers spot an unhealthy server before users complain</span></a></li>
         <li><a href="#2026-11-19-npm-node-modules"><time datetime="2026-11-19">2026-11-19</time><span>npm: why a tiny project downloads thousands of files</span></a></li>
         <li><a href="#2026-11-18-youtube-transcoding"><time datetime="2026-11-18">2026-11-18</time><span>YouTube: what happens in the minutes after you hit Upload</span></a></li>
@@ -292,6 +293,88 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-21-webassembly" data-topic="WebAssembly" data-domain="OS/runtime internals" data-date="2026-11-21">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">OS/runtime internals</span>
+          <time datetime="2026-11-21">21 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">WebAssembly: how a web page runs code that wasn't written for the web</h2>
+        <p class="lede">Photo editors, video tools and games now run inside a browser tab, and many are written in C++ or Rust, not JavaScript. The design challenge: run code from a stranger's website at near-native speed without letting it touch your computer.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>WebAssembly (Wasm)</dt><dd>A compact binary program format that browsers can run safely and quickly. Other languages are compiled into it.</dd></div>
+            <div><dt>Compiler</dt><dd>A tool that translates code you wrote into another form, such as instructions a machine can run.</dd></div>
+            <div><dt>Sandbox</dt><dd>A walled-off space where a program can run but cannot reach anything outside it unless explicitly allowed.</dd></div>
+            <div><dt>Linear memory</dt><dd>One big block of bytes that a Wasm program uses as all of its memory. It cannot see any memory outside that block.</dd></div>
+            <div><dt>Import</dt><dd>A function the outside world (the browser or app running the Wasm) chooses to hand in, such as "draw this" or "read a file".</dd></div>
+            <div><dt>Validation</dt><dd>A check, done before any code runs, that the program follows all the format's safety rules.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say a team has spent ten years building an image editor in C++. Rewriting it in JavaScript would take years and run slower. Instead they use a <dfn class="term" title="A tool that translates code you wrote into another form.">compiler</dfn> to turn the existing code into <dfn class="term" title="A compact binary program format that browsers run safely and quickly.">WebAssembly</dfn>, and ship that file to the browser.</p>
+          <p>A Wasm file is not machine code for any one chip. It is a simple, low-level set of instructions that every browser understands and that maps closely onto what real processors do. The browser turns it into real machine code for your actual device, and it can start doing that while the file is still downloading.</p>
+          <p>The safety comes from two choices. First, the program gets one block of <dfn class="term" title="One big block of bytes that is all the memory a Wasm program can see.">linear memory</dfn> and nothing else. Every read and write is checked to stay inside that block, so the program cannot peek at the browser or other tabs.</p>
+          <p>Second, a Wasm program has no built-in way to do anything in the world: no files, no network, no screen. It can only call the <dfn class="term" title="A function the outside world hands to a Wasm program, such as 'draw this'.">imports</dfn> the page gives it. The page decides what power it gets, and the rest of the <dfn class="term" title="A walled-off space where a program runs but cannot reach outside it.">sandbox</dfn> follows from that.</p>
+          <p>Before running anything, the browser does <dfn class="term" title="A check, before any code runs, that the program follows the format's safety rules.">validation</dfn>: it reads the whole file and rejects it if any instruction breaks the rules, for instance jumping to a random address. A bad file never starts.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: C++ or Rust is compiled to a Wasm file, validated and compiled by the browser, then runs in a sandbox that talks to the page only through imports. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-21-webassembly-d1-t 2026-11-21-webassembly-d1-d">
+              <title id="2026-11-21-webassembly-d1-t">From C++ or Rust to a running Wasm sandbox</title>
+              <desc id="2026-11-21-webassembly-d1-d">Source code is compiled to a .wasm file. The browser validates it and turns it into machine code. The program then runs inside a sandbox with its own memory and reaches the page only through imported functions.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="110" width="150" height="70" rx="10"/><text class="d-text" x="95" y="140" text-anchor="middle">C++ / Rust</text><text class="d-sub" x="95" y="162" text-anchor="middle">source code</text></g>
+              <g class="d-node" style="--i:2"><rect x="230" y="110" width="150" height="70" rx="10"/><text class="d-text" x="305" y="140" text-anchor="middle">.wasm file</text><text class="d-sub" x="305" y="162" text-anchor="middle">compact binary</text></g>
+              <g class="d-node accent" style="--i:4"><rect x="440" y="40" width="300" height="130" rx="10"/><text class="d-text" x="590" y="72" text-anchor="middle">Browser sandbox</text><text class="d-sub" x="590" y="100" text-anchor="middle">validate, then machine code</text><text class="d-sub" x="590" y="128" text-anchor="middle">own memory block only</text></g>
+              <g class="d-node alt" style="--i:6"><rect x="440" y="220" width="300" height="60" rx="10"/><text class="d-text" x="590" y="256" text-anchor="middle">Page: files, screen, network</text></g>
+              <path class="d-edge" style="--i:1" d="M170 145 L230 145"/>
+              <path class="d-arrow" style="--i:1" d="M230 145 L220 140 L220 150 Z"/>
+              <path class="d-edge" style="--i:3" d="M380 145 L440 145"/>
+              <path class="d-arrow" style="--i:3" d="M440 145 L430 140 L430 150 Z"/>
+              <path class="d-edge accent" style="--i:5" d="M590 170 L590 220"/>
+              <path class="d-arrow" style="--i:5" d="M590 220 L585 210 L595 210 Z"/>
+              <text class="d-label" style="--i:1" x="200" y="132" text-anchor="middle">compile</text>
+              <text class="d-label" style="--i:3" x="410" y="132" text-anchor="middle">download</text>
+              <text class="d-label" style="--i:5" x="670" y="200" text-anchor="middle">imports only</text>
+            </svg>
+          </div>
+          <figcaption>Code is compiled ahead of time to a standard format. The browser checks it, runs it, and the only door out is the list of functions the page provides.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>JavaScript is flexible, which makes it hard to speed up: the engine has to guess types while running and be ready to undo its guesses. Wasm is shaped the opposite way. Types are fixed and known before the program runs, so the browser can produce good machine code quickly and predictably. Heavy number crunching, like filters, codecs and physics, benefits most.</p>
+          <p>Why not simply let browsers run real machine code? Because chips differ (phones versus laptops) and trusting arbitrary machine code is dangerous. A neutral format that can be fully checked first solves both. Earlier attempts, such as plug-ins, were either unsafe or tied to one vendor.</p>
+          <p>The trade-off: Wasm is not a faster JavaScript. It cannot touch the page directly, so crossing between the two has a cost, and it makes sense for chunky work, not for lots of tiny calls. Big programs also mean big downloads.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">The program gets a block of memory and a short list of allowed calls. Everything else simply does not exist for it.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident about the sandbox model, linear memory, imports and validation before execution. How each browser compiles Wasm (a fast first pass, then an optimising one) differs by engine and changes over time, so I kept that general. I have not given speed numbers because they vary widely by workload.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Heavy web apps feel native.</strong> Tools like browser-based design and video editors can reuse years-old C++ or Rust code instead of rewriting it.</li>
+            <li><strong>A big first load, then smooth use.</strong> The Wasm file must be downloaded and checked once; after that, the work runs as machine code.</li>
+            <li><strong>Wasm is showing up outside browsers.</strong> Because the sandbox needs no special chip or operating system, servers and plug-in systems use it to run untrusted code safely.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the WebAssembly specification and the MDN WebAssembly documentation, plus the project's security overview. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-20-prometheus-monitoring" data-topic="Prometheus monitoring" data-domain="Infra" data-date="2026-11-20">
       <header class="entry-head">
         <div class="entry-meta">
