@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-22-mongodb-replication"><time datetime="2026-11-22">2026-11-22</time><span>MongoDB: how a database survives its main server dying mid-write</span></a></li>
         <li><a href="#2026-11-21-webassembly"><time datetime="2026-11-21">2026-11-21</time><span>WebAssembly: how a web page runs code that wasn't written for the web</span></a></li>
         <li><a href="#2026-11-20-prometheus-monitoring"><time datetime="2026-11-20">2026-11-20</time><span>Prometheus: how engineers spot an unhealthy server before users complain</span></a></li>
         <li><a href="#2026-11-19-npm-node-modules"><time datetime="2026-11-19">2026-11-19</time><span>npm: why a tiny project downloads thousands of files</span></a></li>
@@ -293,6 +294,86 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-22-mongodb-replication" data-topic="MongoDB replica sets" data-domain="Databases" data-date="2026-11-22">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-11-22">22 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">MongoDB: how a database survives its main server dying mid-write</h2>
+        <p class="lede">A database holding your orders or messages can't just stop when one machine crashes. MongoDB keeps several copies of the data on different servers. The design challenge: keep the copies in step, and pick a new boss quickly when the current one disappears, without losing or doubling any writes.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Replica set</dt><dd>A small group of MongoDB servers (often three) that all hold a copy of the same data.</dd></div>
+            <div><dt>Primary</dt><dd>The one server in the group that accepts writes at any moment. The others are secondaries.</dd></div>
+            <div><dt>Oplog</dt><dd>The operations log: an ordered list of every change the primary has made. Secondaries read it to catch up.</dd></div>
+            <div><dt>Election</dt><dd>A vote among the servers to choose a new primary when the old one seems to be gone.</dd></div>
+            <div><dt>Majority</dt><dd>More than half of the servers. Two out of three counts; one out of three does not.</dd></div>
+            <div><dt>Write concern</dt><dd>A setting on each write that says how many servers must have it before the database tells you "done".</dd></div>
+            <div><dt>Rollback</dt><dd>Undoing writes on a server because the rest of the group never received them.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine you place an order in a shop app, and the database server holding it catches fire a second later. You still expect the order to exist. So MongoDB runs a <dfn class="term" title="A small group of MongoDB servers that all hold a copy of the same data.">replica set</dfn>: usually three servers with the same data.</p>
+          <p>Only one of them, the <dfn class="term" title="The one server that accepts writes at a given moment.">primary</dfn>, accepts writes. Having a single writer means there is never an argument about which change came first. Every change the primary makes is also appended to the <dfn class="term" title="The operations log: an ordered list of every change the primary has made.">oplog</dfn>. The other servers, the secondaries, keep reading that log and replaying the changes in the same order, so they stay close copies.</p>
+          <p>The servers also ping each other every couple of seconds. If the secondaries stop hearing from the primary for long enough (ten seconds by default), one of them calls an <dfn class="term" title="A vote among the servers to choose a new primary.">election</dfn>. A candidate needs votes from a <dfn class="term" title="More than half of the servers.">majority</dfn> to win, then it becomes the new primary and the app's driver quietly starts sending writes to it.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: the app writes to the primary, which records changes in its oplog; two secondaries copy the oplog. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-22-mongodb-replication-d1-t 2026-11-22-mongodb-replication-d1-d">
+              <title id="2026-11-22-mongodb-replication-d1-t">Writes flow to the primary and spread through the oplog</title>
+              <desc id="2026-11-22-mongodb-replication-d1-d">The app sends a write to the primary. The primary stores it and appends it to the oplog. Two secondaries read the oplog and apply the same changes.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="115" width="130" height="70" rx="10"/><text class="d-text" x="85" y="145" text-anchor="middle">App</text><text class="d-sub" x="85" y="167" text-anchor="middle">sends a write</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="270" y="115" width="170" height="70" rx="10"/><text class="d-text" x="355" y="145" text-anchor="middle">Primary</text><text class="d-sub" x="355" y="167" text-anchor="middle">data + oplog</text></g>
+              <g class="d-node alt" style="--i:4"><rect x="570" y="30" width="170" height="70" rx="10"/><text class="d-text" x="655" y="60" text-anchor="middle">Secondary A</text><text class="d-sub" x="655" y="82" text-anchor="middle">replays oplog</text></g>
+              <g class="d-node alt" style="--i:4"><rect x="570" y="200" width="170" height="70" rx="10"/><text class="d-text" x="655" y="230" text-anchor="middle">Secondary B</text><text class="d-sub" x="655" y="252" text-anchor="middle">replays oplog</text></g>
+              <path class="d-edge" style="--i:1" d="M150 150 L270 150"/>
+              <path class="d-arrow" style="--i:1" d="M270 150 L260 145 L260 155 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M440 135 L570 65"/>
+              <path class="d-arrow" style="--i:3" d="M570 65 L559 66 L563 75 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M440 165 L570 235"/>
+              <path class="d-arrow" style="--i:3" d="M570 235 L563 226 L559 234 Z"/>
+              <text class="d-label" style="--i:1" x="210" y="138" text-anchor="middle">write</text>
+              <text class="d-label" style="--i:3" x="490" y="125" text-anchor="middle">oplog copied</text>
+            </svg>
+          </div>
+          <figcaption>One writer, many followers. Secondaries do not decide anything; they copy the primary's log in order.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The hard part is a crash at a bad moment. Say the primary accepts a write, then dies before any secondary copied it. A secondary gets elected, and that write simply does not exist on it. When the old primary comes back, it holds a change the group never agreed on, so it has to undo it. That undo is a <dfn class="term" title="Undoing writes on a server because the rest of the group never received them.">rollback</dfn>.</p>
+          <p>MongoDB lets you choose how careful to be with a <dfn class="term" title="A setting that says how many servers must have a write before the database says 'done'.">write concern</dfn>. Ask for "majority" and the database only says "done" once most servers have the change. Any later election needs a majority too, so at least one voter has your write and the new primary will have it. Ask for less and writes feel faster, but a crash can lose them.</p>
+          <p>The majority rule also stops two primaries existing at once. If the network splits a three-server group into one and two, only the side with two can elect a primary. The lone server steps down and refuses writes, which is the trade-off: availability is sacrificed on the small side to keep the data consistent.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">A write is only really safe once a majority has it, because only a majority can choose the next primary.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident about the primary and oplog design, majority-based elections and write concern. The election protocol is described as inspired by Raft, but I haven't compared the details. Timeouts like the ten-second default are configurable and may differ by version, and default write concern has changed across releases, so check the docs for your version.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Apps see a brief hiccup, not an outage.</strong> During an election, writes fail or wait for a few seconds. Then the driver finds the new primary and retries.</li>
+            <li><strong>Replica sets use odd sizes like three or five.</strong> Three servers tolerate one failure; a fourth adds cost but tolerates no more.</li>
+            <li><strong>Reading from a secondary can show slightly old data.</strong> It is replaying the oplog a moment behind the primary, so it may not have your latest write yet.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the MongoDB manual sections on replication, the oplog, replica set elections and write concern. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-21-webassembly" data-topic="WebAssembly" data-domain="OS/runtime internals" data-date="2026-11-21">
       <header class="entry-head">
         <div class="entry-meta">
