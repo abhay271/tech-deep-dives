@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-23-tcp-congestion-control"><time datetime="2026-11-23">2026-11-23</time><span>TCP congestion control: how millions of strangers share the internet without a referee</span></a></li>
         <li><a href="#2026-11-22-mongodb-replication"><time datetime="2026-11-22">2026-11-22</time><span>MongoDB: how a database survives its main server dying mid-write</span></a></li>
         <li><a href="#2026-11-21-webassembly"><time datetime="2026-11-21">2026-11-21</time><span>WebAssembly: how a web page runs code that wasn't written for the web</span></a></li>
         <li><a href="#2026-11-20-prometheus-monitoring"><time datetime="2026-11-20">2026-11-20</time><span>Prometheus: how engineers spot an unhealthy server before users complain</span></a></li>
@@ -294,6 +295,88 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-23-tcp-congestion-control" data-topic="TCP congestion control" data-domain="Protocols" data-date="2026-11-23">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Protocols</span>
+          <time datetime="2026-11-23">23 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">TCP congestion control: how millions of strangers share the internet without a referee</h2>
+        <p class="lede">When you download a big file, your computer has to decide how fast to send or receive data. Nobody tells it how much the network between you and the server can carry. The design challenge: find that speed by feel, while millions of other connections do the same thing on the same wires.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Packet</dt><dd>A small chunk of data sent over the internet. A file is cut into many packets.</dd></div>
+            <div><dt>Router</dt><dd>A machine in the middle of the network that passes packets along. It has a small waiting line (a buffer) for packets that arrive faster than it can forward them.</dd></div>
+            <div><dt>Congestion window</dt><dd>The number of packets a sender allows itself to have "in flight", sent but not yet acknowledged.</dd></div>
+            <div><dt>Acknowledgement (ACK)</dt><dd>A tiny reply from the receiver saying "I got that packet".</dd></div>
+            <div><dt>Slow start</dt><dd>The opening phase where the window grows very fast, doubling every round trip, until something suggests the limit was reached.</dd></div>
+            <div><dt>AIMD</dt><dd>"Additive increase, multiplicative decrease": grow slowly and steadily, but cut sharply when there is a sign of trouble.</dd></div>
+            <div><dt>Bufferbloat</dt><dd>Delay caused by oversized router buffers that sit full of waiting packets.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Picture a video download on shared Wi-Fi. Your phone could blast out requests as fast as it likes. But somewhere on the path is a <dfn class="term" title="A machine in the middle of the network that passes packets along, with a small waiting line.">router</dfn> with a small waiting line. If too many <dfn class="term" title="A small chunk of data sent over the internet.">packets</dfn> arrive at once, the line overflows and packets get thrown away. Everyone then resends, which adds even more traffic. In the 1980s this actually happened on the early internet and links nearly stopped working.</p>
+          <p>The fix, added to TCP in the late 1980s, puts the sender in charge of itself. It keeps a number called the <dfn class="term" title="How many packets a sender allows itself to have sent but not yet acknowledged.">congestion window</dfn>: how many packets may be in flight at once. Each <dfn class="term" title="A tiny reply from the receiver saying it got a packet.">acknowledgement</dfn> that comes back is a small "all clear", so the sender may send more.</p>
+          <p>It starts timid, with about ten packets, then runs <dfn class="term" title="The opening phase where the window doubles every round trip.">slow start</dfn>. Despite the name, this is fast: the window doubles every round trip. It continues until a packet goes missing. A missing packet is taken as the signal "the network is full".</p>
+          <p>Then it switches to <dfn class="term" title="Additive increase, multiplicative decrease: grow slowly, cut sharply.">AIMD</dfn>. On loss, the sender cuts its window sharply (classic TCP halves it). After that it creeps upward by roughly one packet per round trip, until the next loss. Plot the window over time and you get a sawtooth: climb, drop, climb, drop.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: congestion window over time. It doubles quickly during slow start, drops at a loss, then climbs slowly and drops again in a sawtooth. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-23-tcp-congestion-control-d1-t 2026-11-23-tcp-congestion-control-d1-d">
+              <title id="2026-11-23-tcp-congestion-control-d1-t">The sawtooth of a TCP sender's window</title>
+              <desc id="2026-11-23-tcp-congestion-control-d1-d">A line chart of the congestion window against time. It rises steeply in slow start, drops by half at the first loss, then rises in a straight slow line until the next loss, drops by half again, and repeats.</desc>
+              <path class="d-edge" style="--i:0" d="M60 260 L60 30"/>
+              <path class="d-edge" style="--i:0" d="M60 260 L730 260"/>
+              <text class="d-label" style="--i:0" x="70" y="26">window size</text>
+              <text class="d-label" style="--i:0" x="690" y="284" text-anchor="middle">time</text>
+              <path class="d-edge accent" style="--i:1" d="M70 250 L120 238 L170 214 L220 166 L260 70"/>
+              <path class="d-edge accent" style="--i:2" d="M260 70 L260 160"/>
+              <path class="d-edge accent" style="--i:3" d="M260 160 L460 70"/>
+              <path class="d-edge accent" style="--i:4" d="M460 70 L460 115"/>
+              <path class="d-edge accent" style="--i:4" d="M460 115 L660 70"/>
+              <text class="d-label" style="--i:1" x="130" y="130" text-anchor="middle">slow start</text>
+              <text class="d-label" style="--i:2" x="290" y="62">loss: cut</text>
+              <text class="d-label" style="--i:3" x="400" y="168" text-anchor="middle">slow climb</text>
+              <text class="d-label" style="--i:4" x="490" y="62">loss: cut</text>
+            </svg>
+          </div>
+          <figcaption>The sender is always probing: speed up until the network pushes back, back off a bit, then try again.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>There is no central referee on the internet, and the sender cannot see inside the network. All it can observe is whether packets and their acknowledgements come back. So the design uses that as the only signal: no loss means "room for more", loss means "too much".</p>
+          <p>Why cut sharply but climb slowly? Backing off hard clears a jammed router quickly, which helps everyone. Climbing gently avoids slamming straight into the limit again. It also makes competing connections fair over time: if two senders share a link, the one with more bandwidth loses more when it halves, and both gradually drift toward an equal share, without ever talking to each other.</p>
+          <p>The weakness is that "loss means congestion" is only a guess. On a bad Wi-Fi link packets get lost to radio noise, and the sender wrongly slows down. And routers with huge buffers do not drop packets until the line is very long, so the sender keeps filling it and everything sits waiting. That delay is <dfn class="term" title="Delay caused by oversized router buffers sitting full of waiting packets.">bufferbloat</dfn>. Newer designs, like Google's BBR, try to estimate the link's real speed and delay directly instead of waiting for loss.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Nobody tells TCP the speed limit. It finds it by speeding up until the network says "ouch".</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident about slow start, AIMD, the sawtooth and the idea behind BBR. The details vary: modern systems such as Linux default to an algorithm called CUBIC, which grows its window along a curve and cuts by less than half, and the starting window of about ten packets is a common default, not a law. The diagram is a sketch, not measured data.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Downloads start slow and then speed up.</strong> The sender doesn't know your link speed yet, so it begins with a small window and ramps up. Short transfers often never reach full speed at all.</li>
+            <li><strong>Video calls lag when someone starts a big upload.</strong> The upload fills the router's buffer, and your call's packets wait in that long line. That is bufferbloat.</li>
+            <li><strong>Weak Wi-Fi feels much slower than its raw speed suggests.</strong> Random losses are read as congestion, so the sender keeps cutting its window even though the network isn't full.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Van Jacobson's 1988 paper "Congestion Avoidance and Control", RFC 5681 (TCP congestion control) and RFC 6928 (initial window), and Google's BBR write-ups. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-22-mongodb-replication" data-topic="MongoDB replica sets" data-domain="Databases" data-date="2026-11-22">
       <header class="entry-head">
         <div class="entry-meta">
