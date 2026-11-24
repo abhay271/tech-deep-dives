@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-24-google-search-index"><time datetime="2026-11-24">2026-11-24</time><span>Google Search: how it answers in a blink without reading the web when you ask</span></a></li>
         <li><a href="#2026-11-23-tcp-congestion-control"><time datetime="2026-11-23">2026-11-23</time><span>TCP congestion control: how millions of strangers share the internet without a referee</span></a></li>
         <li><a href="#2026-11-22-mongodb-replication"><time datetime="2026-11-22">2026-11-22</time><span>MongoDB: how a database survives its main server dying mid-write</span></a></li>
         <li><a href="#2026-11-21-webassembly"><time datetime="2026-11-21">2026-11-21</time><span>WebAssembly: how a web page runs code that wasn't written for the web</span></a></li>
@@ -295,6 +296,89 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-24-google-search-index" data-topic="Google Search indexing" data-domain="Consumer apps" data-date="2026-11-24">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Consumer apps</span>
+          <time datetime="2026-11-24">24 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Google Search: how it answers in a blink without reading the web when you ask</h2>
+        <p class="lede">You type a few words and get ranked results in a fraction of a second. Yet the web has billions of pages, and nobody can read them that fast. The design challenge: do almost all the work ahead of time, so that your question only has to look things up.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Crawler</dt><dd>A program that visits web pages, follows their links to find more pages, and saves a copy of what it finds.</dd></div>
+            <div><dt>Index</dt><dd>A prepared lookup structure built from all the saved pages, so a search does not have to read pages one by one.</dd></div>
+            <div><dt>Inverted index</dt><dd>An index that goes from word to pages. For each word, it lists the pages that contain it.</dd></div>
+            <div><dt>Shard</dt><dd>One slice of a big dataset, kept on its own group of machines.</dd></div>
+            <div><dt>Ranking</dt><dd>Sorting the matching pages so the most useful come first.</dd></div>
+            <div><dt>PageRank</dt><dd>An early Google idea: a page is important if other important pages link to it.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say you search for "sourdough starter not rising". Google does not go and read the web now. That would take days. Instead, long before you typed anything, a <dfn class="term" title="A program that visits web pages, follows their links, and saves what it finds.">crawler</dfn> had already visited billions of pages. It starts from known pages, follows every link to find new ones, and comes back from time to time to see what changed.</p>
+          <p>The saved pages are then turned into an <dfn class="term" title="A prepared lookup structure built from the saved pages, so a search does not read pages one by one.">index</dfn>. The key trick is the <dfn class="term" title="An index that maps each word to the list of pages containing it.">inverted index</dfn>. A normal list says "page 17 contains these words". An inverted one flips it: "the word 'sourdough' appears on pages 17, 902 and 4410". It works like the index at the back of a textbook.</p>
+          <p>Now your search is cheap. Look up each word, then find the pages that appear in all the lists. No page is opened at all. The index is far too big for one computer, so it is split into <dfn class="term" title="One slice of a big dataset, kept on its own group of machines.">shards</dfn>. Your query goes to many shards at once, each returns its best matches, and a final step merges them.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: crawler feeds an index ahead of time; at search time a query fans out to index shards and results are merged. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-24-google-search-index-d1-t 2026-11-24-google-search-index-d1-d">
+              <title id="2026-11-24-google-search-index-d1-t">Work done ahead of time versus work done at search time</title>
+              <desc id="2026-11-24-google-search-index-d1-d">Top row, done in advance: the crawler saves web pages and builds the index. Bottom row, done at search time: your query fans out to index shards, and the results are merged and ranked.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="30" width="150" height="60" rx="10"/><text class="d-text" x="95" y="56" text-anchor="middle">Crawler</text><text class="d-sub" x="95" y="76" text-anchor="middle">visits pages</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="300" y="30" width="170" height="60" rx="10"/><text class="d-text" x="385" y="56" text-anchor="middle">Index</text><text class="d-sub" x="385" y="76" text-anchor="middle">word → pages</text></g>
+              <path class="d-edge" style="--i:1" d="M170 60 L300 60"/>
+              <path class="d-arrow" style="--i:1" d="M300 60 L290 54 L290 66 Z"/>
+              <text class="d-label" style="--i:1" x="235" y="50" text-anchor="middle">ahead of time</text>
+              <g class="d-node" style="--i:3"><rect x="20" y="200" width="150" height="60" rx="10"/><text class="d-text" x="95" y="226" text-anchor="middle">Your query</text><text class="d-sub" x="95" y="246" text-anchor="middle">a few words</text></g>
+              <g class="d-node alt" style="--i:5"><rect x="300" y="200" width="170" height="60" rx="10"/><text class="d-text" x="385" y="226" text-anchor="middle">Many shards</text><text class="d-sub" x="385" y="246" text-anchor="middle">each finds matches</text></g>
+              <g class="d-node accent" style="--i:7"><rect x="580" y="200" width="160" height="60" rx="10"/><text class="d-text" x="660" y="226" text-anchor="middle">Merge + rank</text><text class="d-sub" x="660" y="246" text-anchor="middle">best first</text></g>
+              <path class="d-edge" style="--i:4" d="M170 230 L300 230"/>
+              <path class="d-arrow" style="--i:4" d="M300 230 L290 224 L290 236 Z"/>
+              <path class="d-edge" style="--i:6" d="M470 230 L580 230"/>
+              <path class="d-arrow" style="--i:6" d="M580 230 L570 224 L570 236 Z"/>
+              <path class="d-edge" style="--i:5" d="M385 90 L385 200"/>
+              <path class="d-arrow" style="--i:5" d="M385 200 L379 190 L391 190 Z"/>
+              <text class="d-label" style="--i:5" x="395" y="150">lookups only</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M95 230 L385 230 L660 230"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Crawling and indexing happen all the time in the background. Your search only touches the bottom row.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The constraint is time. People will wait a fraction of a second, but the web is far too large to scan in that time. So the design moves the expensive work (finding pages, reading them, organising them) to before the question, and leaves only cheap lookups for after it. Splitting the index across many machines, all working on one query in parallel, keeps each lookup small.</p>
+          <p>Matching is only half of it, because a common word can match millions of pages. The other half is <dfn class="term" title="Sorting matching pages so the most useful come first.">ranking</dfn>. Google's original idea, <dfn class="term" title="An early Google idea: a page is important if important pages link to it.">PageRank</dfn>, treated links as votes: a page linked from many trusted pages is probably good. Today ranking mixes many more signals, such as how well the words match, how fresh the page is, and how it behaves for users. The exact recipe is secret and changes often.</p>
+          <p>The cost of this design is staleness. The index is a snapshot, so a page that changed a minute ago may still show its old content until the crawler returns.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">A search doesn't read the web. It reads a very well-organised summary of it, built earlier.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident about the crawl, inverted index, sharding and PageRank story. How Google splits its index today, how often it re-crawls, and what the modern ranking signals are is not public in detail, so I have kept those vague on purpose.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Results appear before you finish typing.</strong> Lookups are cheap, so the system can afford to run them for every few keystrokes.</li>
+            <li><strong>A brand-new page doesn't show up straight away.</strong> It has to be found by the crawler and added to the index first. Sites can ask to be re-crawled sooner, but it is not instant.</li>
+            <li><strong>Deleted pages still appear in results for a while.</strong> The index is a snapshot, and it only changes once the crawler notices the page is gone.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: Brin and Page, "The Anatomy of a Large-Scale Hypertextual Web Search Engine" (1998), and Google's public Search documentation on crawling and indexing. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-23-tcp-congestion-control" data-topic="TCP congestion control" data-domain="Protocols" data-date="2026-11-23">
       <header class="entry-head">
         <div class="entry-meta">
