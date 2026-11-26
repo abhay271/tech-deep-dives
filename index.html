@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-26-lets-encrypt-acme"><time datetime="2026-11-26">2026-11-26</time><span>Let's Encrypt: how a free service vouches for millions of websites with no humans involved</span></a></li>
         <li><a href="#2026-11-25-chrome-site-isolation"><time datetime="2026-11-25">2026-11-25</time><span>Chrome: why every tab is locked in its own room</span></a></li>
         <li><a href="#2026-11-24-google-search-index"><time datetime="2026-11-24">2026-11-24</time><span>Google Search: how it answers in a blink without reading the web when you ask</span></a></li>
         <li><a href="#2026-11-23-tcp-congestion-control"><time datetime="2026-11-23">2026-11-23</time><span>TCP congestion control: how millions of strangers share the internet without a referee</span></a></li>
@@ -297,6 +298,88 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-26-lets-encrypt-acme" data-topic="Let's Encrypt and ACME" data-domain="Infra" data-date="2026-11-26">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Infra</span>
+          <time datetime="2026-11-26">26 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">Let's Encrypt: how a free service vouches for millions of websites with no humans involved</h2>
+        <p class="lede">The padlock in your browser means a trusted authority has confirmed that the site really owns its name. For years that meant paperwork and a fee. The design challenge: check ownership of a domain automatically, in seconds, for millions of sites, without anyone being able to fake it.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Certificate</dt><dd>A small signed file that says "this public key belongs to example.com". Your browser uses it to be sure it is talking to the real site.</dd></div>
+            <div><dt>Certificate authority (CA)</dt><dd>An organization that browsers trust to sign certificates, but only after checking that the requester controls the domain.</dd></div>
+            <div><dt>ACME</dt><dd>The standard conversation a program has with a CA to ask for a certificate and prove domain ownership, with no human involved.</dd></div>
+            <div><dt>Challenge</dt><dd>A small task the CA hands out, such as "publish this random string on your site". Only the real owner can do it.</dd></div>
+            <div><dt>Revocation</dt><dd>Cancelling a certificate before its expiry date, for example because its private key leaked. In practice it works unreliably.</dd></div>
+            <div><dt>Certificate Transparency</dt><dd>Public, append-only logs where CAs must record every certificate they issue, so anyone can look for suspicious ones.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Suppose you start a small shop and want <code>https://myshop.example</code> to show the padlock. Browsers only accept a <dfn class="term" title="A signed file saying this public key belongs to a given domain name.">certificate</dfn> signed by a <dfn class="term" title="An organization browsers trust to sign certificates after checking domain ownership.">certificate authority</dfn>. Not long ago you would have paid one, filled in a form and pasted files around by hand. Let's Encrypt, started in 2015, made that free and automatic.</p>
+          <p>The automatic part is a standard called <dfn class="term" title="The standard conversation a program has with a certificate authority to get a certificate without human involvement.">ACME</dfn>. A small program on your server, such as <code>certbot</code>, creates a secret key that never leaves your machine, then asks Let's Encrypt for a certificate for your domain.</p>
+          <p>The CA can't just believe you, so it sets a <dfn class="term" title="A small task from the CA that only the real domain owner can do.">challenge</dfn>. The most common one says: "serve this random token at a specific address on your site." The CA then fetches that address itself. If the token is there, whoever answered controls the site, and the CA signs your certificate. The whole exchange takes seconds and nobody reads an email.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: the four steps of getting a certificate from Let's Encrypt. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-26-lets-encrypt-acme-d1-t 2026-11-26-lets-encrypt-acme-d1-d">
+              <title id="2026-11-26-lets-encrypt-acme-d1-t">Getting a certificate by proving control of a domain</title>
+              <desc id="2026-11-26-lets-encrypt-acme-d1-d">Four steps between your server and Let's Encrypt. Your server asks for a certificate for its domain. Let's Encrypt replies with a random token to publish. Let's Encrypt fetches the token from the website. Once it is found, Let's Encrypt sends back the signed certificate.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="20" width="180" height="260" rx="10"/><text class="d-text" x="110" y="140" text-anchor="middle">Your server</text><text class="d-sub" x="110" y="162" text-anchor="middle">ACME client</text></g>
+              <g class="d-node accent" style="--i:0"><rect x="540" y="20" width="200" height="260" rx="10"/><text class="d-text" x="640" y="140" text-anchor="middle">Let's Encrypt</text><text class="d-sub" x="640" y="162" text-anchor="middle">certificate authority</text></g>
+              <path class="d-edge" style="--i:1" d="M200 70 L540 70"/>
+              <path class="d-arrow" style="--i:1" d="M540 70 L530 64 L530 76 Z"/>
+              <text class="d-label" style="--i:1" x="370" y="58" text-anchor="middle">1. I want a cert for myshop.example</text>
+              <path class="d-edge" style="--i:2" d="M540 130 L200 130"/>
+              <path class="d-arrow" style="--i:2" d="M200 130 L210 124 L210 136 Z"/>
+              <text class="d-label" style="--i:2" x="370" y="118" text-anchor="middle">2. Publish this random token</text>
+              <path class="d-edge" style="--i:3" d="M540 190 L200 190"/>
+              <path class="d-arrow" style="--i:3" d="M200 190 L210 184 L210 196 Z"/>
+              <text class="d-label" style="--i:3" x="370" y="178" text-anchor="middle">3. CA visits your site, finds token</text>
+              <path class="d-edge accent" style="--i:4" d="M540 250 L200 250"/>
+              <path class="d-arrow" style="--i:4" d="M200 250 L210 244 L210 256 Z"/>
+              <text class="d-label" style="--i:4" x="370" y="238" text-anchor="middle">4. Here is your signed certificate</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M200 70 L540 70"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>Proof of ownership is a task, not a document. Whoever can answer at the domain's address is, for the CA's purposes, the owner.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The old process didn't scale. If every certificate needs a human, people skip HTTPS, or forget to renew and their site shows a scary warning. Automation removes both problems, but only if the check can also be automated, which is why the challenge is something a program can do: serve a file, or publish a DNS record. The DNS version is how you get a wildcard certificate covering every subdomain.</p>
+          <p>Automation also let Let's Encrypt make certificates <em>short-lived</em>: 90 days, where older ones lasted years. That is deliberate. <dfn class="term" title="Cancelling a certificate before it expires. It works unreliably in practice.">Revocation</dfn> is weak, since browsers don't always check it. So if a key leaks, the best protection is that the certificate soon dies by itself. Short lifetimes are only bearable because software renews them in the background, usually long before expiry.</p>
+          <p>And since a CA could be tricked or hacked into signing a certificate for a domain it shouldn't, every certificate is also written to public <dfn class="term" title="Public append-only logs of every certificate issued, which anyone can inspect.">Certificate Transparency</dfn> logs. Domain owners and researchers can watch those logs and spot a certificate they never asked for.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">The trick wasn't new cryptography. It was making the proof of ownership small enough for a program to do, so no human has to be in the loop.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident about the ACME flow, the challenge types and the 90-day lifetime as the long-standing default. Let's Encrypt has been moving towards even shorter lifetimes and offering new options, and the exact timeline and details change, so check their current announcements. I have also left out how the CA checks from several network locations to resist tampering, since the specifics vary.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Your site once broke with "certificate expired".</strong> Renewal is a scheduled job. If it silently fails (a closed port, a changed config), nobody notices until the old certificate runs out.</li>
+            <li><strong>Hosting dashboards say "port 80 must be open" for HTTPS.</strong> The common challenge is fetched over plain HTTP, so the CA needs a way in.</li>
+            <li><strong>New subdomains get probed within minutes.</strong> Because every certificate goes into public logs, bots watch them and immediately start scanning the freshly announced names.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: RFC 8555 (ACME), Let's Encrypt documentation on challenge types and certificate lifetimes, and the Certificate Transparency documentation (RFC 6962). Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-25-chrome-site-isolation" data-topic="Chrome multi-process sandbox and site isolation" data-domain="OS/runtime internals" data-date="2026-11-25">
       <header class="entry-head">
         <div class="entry-meta">
