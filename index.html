@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-27-source-maps"><time datetime="2026-11-27">2026-11-27</time><span>Source maps: how your browser shows code you wrote but never actually ran</span></a></li>
         <li><a href="#2026-11-26-lets-encrypt-acme"><time datetime="2026-11-26">2026-11-26</time><span>Let's Encrypt: how a free service vouches for millions of websites with no humans involved</span></a></li>
         <li><a href="#2026-11-25-chrome-site-isolation"><time datetime="2026-11-25">2026-11-25</time><span>Chrome: why every tab is locked in its own room</span></a></li>
         <li><a href="#2026-11-24-google-search-index"><time datetime="2026-11-24">2026-11-24</time><span>Google Search: how it answers in a blink without reading the web when you ask</span></a></li>
@@ -298,6 +299,88 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-27-source-maps" data-topic="Source maps" data-domain="Dev tools" data-date="2026-11-27">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Dev tools</span>
+          <time datetime="2026-11-27">27 Nov 2026</time>
+          <span class="read"><span class="read-time">4</span> min read</span>
+        </div>
+        <h2 class="entry-title">Source maps: how your browser shows code you wrote but never actually ran</h2>
+        <p class="lede">Websites ship JavaScript that has been squashed, renamed and rearranged to load faster. Yet when something breaks, the browser's developer tools show your own tidy file with the right line highlighted. The design challenge: translate a position in unreadable code back to a position in the code a human wrote, cheaply and exactly.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>Minification</dt><dd>Shrinking code by removing spaces and comments and renaming variables to one or two letters. The code behaves the same but is far smaller and nearly unreadable.</dd></div>
+            <div><dt>Bundler</dt><dd>A tool that takes many source files, often in TypeScript or another language, and turns them into a few plain JavaScript files for the browser.</dd></div>
+            <div><dt>Source map</dt><dd>A separate file that records which spot in the shipped code came from which spot in the original source.</dd></div>
+            <div><dt>Stack trace</dt><dd>The list of function calls, with file names and line numbers, printed when a program crashes.</dd></div>
+            <div><dt>Delta encoding</dt><dd>Storing each number as the difference from the previous one instead of the full value. Differences are usually small, so they take less room.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Say you write a neat file called <code>cart.ts</code> with a function named <code>calculateShippingCost</code>. Before it reaches users, a <dfn class="term" title="A tool that turns many source files into a few plain JavaScript files the browser can run.">bundler</dfn> merges it with hundreds of other files, converts TypeScript to JavaScript, and <dfn class="term" title="Shrinking code by stripping spaces and comments and renaming variables to short names.">minifies</dfn> it. The result might be one giant line where your function is called <code>t</code>. When a user hits an error, the browser reports "line 1, column 48,201 of bundle.js". That tells you nothing.</p>
+          <p>The fix is a second file shipped beside the bundle, called a <dfn class="term" title="A file that maps positions in shipped code back to the original source files.">source map</dfn>. It is a lookup table: "this stretch of the output came from line 12, column 4 of <code>cart.ts</code>, and the name there was <code>calculateShippingCost</code>." The bundle points to it with a comment on its last line, <code>//# sourceMappingURL=bundle.js.map</code>.</p>
+          <p>The map is plain JSON. It lists the original files, optionally their full text, a list of original names, and one long string called <code>mappings</code> holding the table. Developer tools read it and show you the original file, set breakpoints in it, and display real names in the call list.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: source files are built into a bundle and a map, and developer tools use both. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-27-source-maps-d1-t 2026-11-27-source-maps-d1-d">
+              <title id="2026-11-27-source-maps-d1-t">The build makes two outputs, developer tools join them</title>
+              <desc id="2026-11-27-source-maps-d1-d">Your original source files go through the build. The build produces a minified bundle that users run and a source map file. When an error happens in the bundle, developer tools read the source map and show the position in the original source.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="110" width="150" height="80" rx="10"/><text class="d-text" x="95" y="145" text-anchor="middle">Your source</text><text class="d-sub" x="95" y="168" text-anchor="middle">cart.ts and more</text></g>
+              <g class="d-node alt" style="--i:2"><rect x="300" y="30" width="170" height="70" rx="10"/><text class="d-text" x="385" y="62" text-anchor="middle">bundle.js</text><text class="d-sub" x="385" y="84" text-anchor="middle">small, unreadable</text></g>
+              <g class="d-node accent" style="--i:2"><rect x="300" y="200" width="170" height="70" rx="10"/><text class="d-text" x="385" y="232" text-anchor="middle">bundle.js.map</text><text class="d-sub" x="385" y="254" text-anchor="middle">the lookup table</text></g>
+              <g class="d-node" style="--i:4"><rect x="580" y="110" width="160" height="80" rx="10"/><text class="d-text" x="660" y="145" text-anchor="middle">Dev tools</text><text class="d-sub" x="660" y="168" text-anchor="middle">shows cart.ts line 12</text></g>
+              <path class="d-edge" style="--i:1" d="M170 130 L300 65"/>
+              <path class="d-arrow" style="--i:1" d="M300 65 L289 66 L295 56 Z"/>
+              <path class="d-edge" style="--i:1" d="M170 170 L300 235"/>
+              <path class="d-arrow" style="--i:1" d="M300 235 L295 244 L289 234 Z"/>
+              <text class="d-label" style="--i:1" x="120" y="60" text-anchor="middle">1. build</text>
+              <path class="d-edge" style="--i:3" d="M470 65 L580 130"/>
+              <path class="d-arrow" style="--i:3" d="M580 130 L569 129 L575 119 Z"/>
+              <path class="d-edge accent" style="--i:3" d="M470 235 L580 170"/>
+              <path class="d-arrow" style="--i:3" d="M580 170 L575 181 L569 171 Z"/>
+              <text class="d-label" style="--i:3" x="640" y="70" text-anchor="middle">2. error at col 48,201</text>
+              <text class="d-label" style="--i:3" x="640" y="250" text-anchor="middle">3. look up original</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M170 130 L300 65"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The build writes the answer key at the same moment it scrambles the code. Anyone holding both can translate back.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>The table could have been a plain list: "output position, source file, source line, source column", repeated for every few characters of code. For a big app that list would be larger than the code itself, and users would download it for nothing. So the format squeezes it hard.</p>
+          <p>The <code>mappings</code> string is split by output line, and each line into small segments. Every number in a segment is a <dfn class="term" title="Storing each value as the change from the previous one, which keeps numbers small.">delta</dfn> from the previous segment, since neighbouring pieces of code usually come from neighbouring spots in the source. Small numbers are then written in a compact text form called Base64 VLQ, so a whole segment is often just a few letters. The cost is that the file is unreadable to humans. That is acceptable, because only tools read it.</p>
+          <p>Browsers also fetch the map lazily. Normal visitors only download the bundle. The map is requested only when developer tools are open, so the extra weight does not slow the page for users.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Minifying throws information away on purpose. A source map is the receipt that lets you get just enough of it back.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the overall design: the JSON fields, the comment that links to the map, and delta-encoded mappings. The exact encoding details and newer extensions, such as extra debugging information, are still evolving in the standardization effort, so check the current specification before building a tool on them.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Error trackers ask you to upload maps.</strong> A production <dfn class="term" title="The list of function calls, with file names and line numbers, printed at a crash.">stack trace</dfn> points into the minified bundle. Services keep your map privately and translate each report back to your real file and line, without exposing your source to everyone.</li>
+            <li><strong>Sometimes you can read a site's original code in dev tools.</strong> If the map is public and includes the original text, anyone can rebuild the source tree. Teams that don't want that either keep maps private or leave them out of production.</li>
+            <li><strong>Debugging sometimes lands on slightly wrong lines.</strong> The map only has entries at certain points. If the build tool recorded a coarse map, or another tool changed the code afterwards without updating it, positions are guesses.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: the Source Map specification (originally "Source Map Revision 3" and now being standardized by TC39), and browser developer tools documentation. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-26-lets-encrypt-acme" data-topic="Let's Encrypt and ACME" data-domain="Infra" data-date="2026-11-26">
       <header class="entry-head">
         <div class="entry-meta">
