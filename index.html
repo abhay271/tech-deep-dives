@@ -233,6 +233,7 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
       <h2>Archive</h2>
       <ol class="toc">
         <!-- TOC -->
+        <li><a href="#2026-11-28-etcd-raft"><time datetime="2026-11-28">2026-11-28</time><span>etcd and Raft: how three computers agree on one truth when any of them can die</span></a></li>
         <li><a href="#2026-11-27-source-maps"><time datetime="2026-11-27">2026-11-27</time><span>Source maps: how your browser shows code you wrote but never actually ran</span></a></li>
         <li><a href="#2026-11-26-lets-encrypt-acme"><time datetime="2026-11-26">2026-11-26</time><span>Let's Encrypt: how a free service vouches for millions of websites with no humans involved</span></a></li>
         <li><a href="#2026-11-25-chrome-site-isolation"><time datetime="2026-11-25">2026-11-25</time><span>Chrome: why every tab is locked in its own room</span></a></li>
@@ -299,6 +300,90 @@ dfn.term{font-style:normal;border-bottom:1px dotted var(--accent);cursor:help}
 
   <main id="entries" tabindex="-1">
     <!-- ENTRIES -->
+    <article class="entry" id="2026-11-28-etcd-raft" data-topic="etcd and Raft consensus" data-domain="Databases" data-date="2026-11-28">
+      <header class="entry-head">
+        <div class="entry-meta">
+          <span class="chip">Databases</span>
+          <time datetime="2026-11-28">28 Nov 2026</time>
+          <span class="read"><span class="read-time">5</span> min read</span>
+        </div>
+        <h2 class="entry-title">etcd and Raft: how three computers agree on one truth when any of them can die</h2>
+        <p class="lede">Kubernetes keeps the whole state of your cluster in a small database called etcd. If that database lost data or gave two different answers, everything built on it would go wrong. The design challenge: keep a few copies on different machines that always agree, even while machines crash and networks drop messages.</p>
+      </header>
+      <div class="prose">
+        <details class="legend" open>
+          <summary>Legend: terms used below</summary>
+          <dl>
+            <div><dt>etcd</dt><dd>A small, very reliable key-value database. Kubernetes stores its cluster settings and state in it.</dd></div>
+            <div><dt>Consensus</dt><dd>Getting several computers to agree on one answer, such as "what is the next change?", even if some of them fail.</dd></div>
+            <div><dt>Raft</dt><dd>A consensus algorithm designed to be easy to understand. etcd uses it.</dd></div>
+            <div><dt>Leader</dt><dd>The one machine that currently accepts changes and tells the others about them.</dd></div>
+            <div><dt>Log</dt><dd>An ordered list of changes. If every machine applies the same log in the same order, they end up with the same data.</dd></div>
+            <div><dt>Quorum</dt><dd>A majority of the machines. With 3 machines, any 2 are a quorum.</dd></div>
+            <div><dt>Term</dt><dd>A numbered period of leadership. Each new election starts a higher-numbered term.</dd></div>
+          </dl>
+        </details>
+
+        <section class="reveal">
+          <h3>The design</h3>
+          <p>Imagine you tell Kubernetes "run 5 copies of my app". That wish has to be saved somewhere safe. If it lived on one machine and that machine died, the cluster would forget what it was supposed to be doing. So <dfn class="term" title="A small, reliable key-value database used by Kubernetes to store cluster state.">etcd</dfn> runs on several machines, usually 3 or 5, each holding a full copy.</p>
+          <p>Copies are easy. Keeping them identical is the hard part. If two machines accept different changes at the same time, the copies drift apart and nobody knows which is right. The algorithm that prevents this is <dfn class="term" title="A consensus algorithm built to be easy to understand.">Raft</dfn>.</p>
+          <p>Raft's first rule is simple: at any moment there is one <dfn class="term" title="The one machine that accepts changes and sends them to the others.">leader</dfn>. Every write goes to the leader. The leader appends it to its <dfn class="term" title="An ordered list of changes. Same log in the same order means same data.">log</dfn> and sends it to the others, who add it to their logs. Once a <dfn class="term" title="A majority of the machines, such as 2 out of 3.">quorum</dfn> has stored the entry, the leader calls it committed and answers "done". It does not wait for every machine, only a majority.</p>
+        </section>
+
+        <figure class="diagram-fig">
+          <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: a write goes to the leader and is copied to two followers. Scrollable on small screens.">
+            <svg class="diagram" viewBox="0 0 760 300" role="img" aria-labelledby="2026-11-28-etcd-raft-d1-t 2026-11-28-etcd-raft-d1-d">
+              <title id="2026-11-28-etcd-raft-d1-t">A write is committed once a majority has it</title>
+              <desc id="2026-11-28-etcd-raft-d1-d">A client sends a write to the leader. The leader copies the entry to two followers. When at least one follower confirms, the leader and that follower form a majority of three, so the leader replies to the client that the write is done.</desc>
+              <g class="d-node" style="--i:0"><rect x="20" y="110" width="120" height="80" rx="10"/><text class="d-text" x="80" y="145" text-anchor="middle">Client</text><text class="d-sub" x="80" y="168" text-anchor="middle">"run 5 copies"</text></g>
+              <g class="d-node accent" style="--i:1"><rect x="270" y="110" width="150" height="80" rx="10"/><text class="d-text" x="345" y="145" text-anchor="middle">Leader</text><text class="d-sub" x="345" y="168" text-anchor="middle">adds to its log</text></g>
+              <g class="d-node alt" style="--i:3"><rect x="590" y="20" width="150" height="80" rx="10"/><text class="d-text" x="665" y="55" text-anchor="middle">Follower A</text><text class="d-sub" x="665" y="78" text-anchor="middle">stores entry</text></g>
+              <g class="d-node alt" style="--i:3"><rect x="590" y="200" width="150" height="80" rx="10"/><text class="d-text" x="665" y="235" text-anchor="middle">Follower B</text><text class="d-sub" x="665" y="258" text-anchor="middle">stores entry</text></g>
+              <path class="d-edge" style="--i:1" d="M140 150 L270 150"/>
+              <path class="d-arrow" style="--i:1" d="M270 150 L259 144 L259 156 Z"/>
+              <text class="d-label" style="--i:1" x="205" y="135" text-anchor="middle">1. write</text>
+              <path class="d-edge accent" style="--i:2" d="M420 135 L590 70"/>
+              <path class="d-arrow" style="--i:2" d="M590 70 L579 70 L583 60 Z"/>
+              <path class="d-edge accent" style="--i:2" d="M420 165 L590 230"/>
+              <path class="d-arrow" style="--i:2" d="M590 230 L583 240 L579 230 Z"/>
+              <text class="d-label" style="--i:2" x="480" y="40" text-anchor="middle">2. copy to followers</text>
+              <text class="d-label" style="--i:4" x="345" y="260" text-anchor="middle">3. majority has it: reply "done"</text>
+              <circle class="d-packet" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.7;1" calcMode="linear" path="M140 150 L270 150"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.03;.68;.7;1"/></circle>
+              <circle class="d-packet alt" r="5" opacity="0"><animateMotion dur="5s" begin="1s" repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes="0;.3;.7;1" calcMode="linear" path="M420 135 L590 70"/><animate attributeName="opacity" dur="5s" begin="1s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.3;.33;.68;.7;1"/></circle>
+            </svg>
+          </div>
+          <figcaption>The leader answers as soon as a majority has the entry. One slow or dead follower does not hold things up.</figcaption>
+          <button class="replay" type="button" aria-label="Replay diagram animation">↻ Replay</button>
+        </figure>
+
+        <aside class="callout why reveal">
+          <span class="callout-label">Why</span>
+          <p>Why a majority and not everyone? Because machines fail. If every copy had to confirm, one dead machine would freeze all writes. A majority means a 3-machine cluster keeps working with 1 down, and a 5-machine cluster survives 2.</p>
+          <p>The majority rule also solves a nastier problem: a network split. Say the leader gets cut off from the other two. Those two can't hear it, so after a random short wait one of them starts an election in a new <dfn class="term" title="A numbered period of leadership. Each election starts a higher term.">term</dfn>, asks for votes, and wins with 2 of 3. Meanwhile the old leader, alone, can't reach a majority, so it can never commit anything. Two machines can't both hold a majority, so you never get two leaders making conflicting decisions.</p>
+          <p>When the network heals, the old leader sees the higher term, steps down, and throws away any uncommitted entries to match the new leader's log. Nothing that was ever acknowledged to a client is lost, because acknowledged means a majority stored it, and any new leader must have come from that majority.</p>
+          <p>The price is speed. Every write waits for a trip to disk and a round trip to other machines. That is why etcd is meant for small, important data, not for storing your photos.</p>
+        </aside>
+
+        <blockquote class="pullquote reveal">Agreement is not about everyone answering. It is about making sure two groups can never both believe they are in charge.</blockquote>
+
+        <aside class="confidence reveal">
+          <span class="callout-label">Confidence note</span>
+          <p>I'm confident in the core of Raft: leader, log replication, majority commit, terms and elections. I left out details like how followers catch up on missing entries, snapshots, and etcd's own tuning. Check the Raft paper and the etcd docs for those.</p>
+        </aside>
+
+        <section class="reveal">
+          <h3>Things this explains</h3>
+          <ol class="explains stagger">
+            <li><strong>Clusters use odd numbers of machines.</strong> A 4-machine cluster needs 3 for a majority, so it survives only 1 failure, the same as 3 machines. The extra machine adds cost but no extra safety.</li>
+            <li><strong>Kubernetes freezes, instead of going wrong, when etcd loses its majority.</strong> Running apps keep running, but you can't change anything. The system chooses to stop rather than risk two conflicting versions of the truth.</li>
+            <li><strong>A short pause after a leader dies.</strong> Followers wait for a timeout before starting an election, so for a moment no one can accept writes. Then a new leader appears and work resumes.</li>
+          </ol>
+        </section>
+
+        <p class="sources">Sources: "In Search of an Understandable Consensus Algorithm" (the Raft paper, Ongaro and Ousterhout) and the etcd documentation. Not re-checked live in this run; written from these sources as I know them.</p>
+      </div>
+    </article>
     <article class="entry" id="2026-11-27-source-maps" data-topic="Source maps" data-domain="Dev tools" data-date="2026-11-27">
       <header class="entry-head">
         <div class="entry-meta">
